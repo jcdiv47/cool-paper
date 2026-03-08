@@ -188,13 +188,13 @@ export default function PaperPage({
 
       {/* Mobile FAB to access notes sidebar */}
       <button
-        className={`fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+        className={`fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         onClick={() => setMobileSidebar(true)}
         aria-label="Open notes"
       >
-        <FileText className="h-5 w-5" />
+        <FileText className="h-4.5 w-4.5 text-foreground" />
         {notes.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium text-destructive-foreground">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
             {notes.length}
           </span>
         )}

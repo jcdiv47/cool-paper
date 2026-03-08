@@ -133,27 +133,16 @@
 @keyframes card-enter {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.98);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .animate-card-enter {
-  animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-/* Skeleton shimmer */
-@keyframes shimmer {
-  0% { opacity: 0.4; }
-  50% { opacity: 0.7; }
-  100% { opacity: 0.4; }
-}
-
-.animate-shimmer {
-  animation: shimmer 1.8s ease-in-out infinite;
+  animation: card-enter 0.35s cubic-bezier(0.25, 1, 0.5, 1) both;
 }
 
 .prose .katex-display {

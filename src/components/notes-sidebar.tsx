@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Loader2, RefreshCw, Search, Sparkles, Trash2, X } from "lucide-react";
+import { FileText, Loader2, PenLine, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type { NoteFile } from "@/types";
 
@@ -108,7 +108,7 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
             {generating ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <Sparkles className="h-3 w-3" />
+              <PenLine className="h-3 w-3" />
             )}
             {generating ? "Generating…" : "Generate"}
           </Button>

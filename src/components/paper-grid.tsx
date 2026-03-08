@@ -50,23 +50,20 @@ export function PaperGrid({ papers, onDelete, onAdd }: PaperGridProps) {
   if (papers.length === 0) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
-        <div className="relative">
-          <div className="absolute -inset-4 rounded-full bg-amber-500/5 blur-xl" />
-          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl border border-border/30 bg-card/40">
-            <FileText className="h-9 w-9 text-muted-foreground/40" />
-          </div>
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/40 bg-card/30">
+          <FileText className="h-7 w-7 text-muted-foreground/30" />
         </div>
         <div className="space-y-2">
-          <h2 className="font-serif text-2xl font-medium tracking-tight">
+          <h2 className="font-serif text-xl font-medium tracking-tight">
             Your library is empty
           </h2>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground/60">
-            Start building your research collection by adding an arxiv paper
+          <p className="max-w-xs text-sm text-muted-foreground/60">
+            Add an arxiv paper to get started
           </p>
         </div>
-        <Button onClick={onAdd} className="gap-2">
+        <Button onClick={onAdd} variant="outline" className="gap-2">
           <Plus className="h-4 w-4" />
-          Add Your First Paper
+          Add Paper
         </Button>
       </div>
     );
@@ -75,27 +72,27 @@ export function PaperGrid({ papers, onDelete, onAdd }: PaperGridProps) {
   return (
     <div className="space-y-6">
       {/* Search + stats */}
-      <div className="space-y-3">
-        <div className="relative sm:max-w-lg">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
+      <div className="space-y-2">
+        <div className="relative sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by title, author, or category..."
-            className="h-11 rounded-xl border-border/30 bg-card/20 pl-11 text-sm backdrop-blur-sm placeholder:text-muted-foreground/30 focus-visible:border-border/50 focus-visible:bg-card/30"
+            placeholder="Search papers..."
+            className="h-10 pl-10 text-sm"
           />
         </div>
-        <p className="text-[12px] tracking-wide text-muted-foreground/40">
+        <p className="text-xs text-muted-foreground/40">
           {filtered.length} {filtered.length === 1 ? "paper" : "papers"}
           {search && ` matching "${search}"`}
-          {!search && " in your library"}
+          {!search && " in library"}
         </p>
       </div>
 
       {/* Grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <Search className="h-8 w-8 text-muted-foreground/20" />
+          <Search className="h-6 w-6 text-muted-foreground/20" />
           <p className="text-sm text-muted-foreground/50">
             No papers match &ldquo;{search}&rdquo;
           </p>

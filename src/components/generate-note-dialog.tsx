@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Terminal, Sparkles } from "lucide-react";
+import { Copy, Check, Terminal, PenLine } from "lucide-react";
 import { QUICK_PROMPTS, PROMPT_TEMPLATES } from "@/lib/quick-prompts";
 import type { PaperMetadata } from "@/types";
 
@@ -183,7 +183,7 @@ export function GenerateNoteDialog({
                 onClick={handleGenerate}
                 disabled={!prompt.trim()}
               >
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                <PenLine className="mr-1.5 h-3.5 w-3.5" />
                 Generate
               </Button>
             </>

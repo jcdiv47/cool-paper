@@ -71,33 +71,24 @@ export default function Home() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {loading ? (
           <div className="space-y-6">
-            {/* Skeleton search */}
-            <div className="space-y-3">
-              <div className="h-11 w-full max-w-lg animate-shimmer rounded-xl border border-border/20 bg-card/15" />
-              <div className="h-3 w-32 animate-shimmer rounded bg-muted/20" />
+            <div className="space-y-2">
+              <div className="h-10 w-full max-w-md animate-pulse rounded-lg bg-muted/20" />
+              <div className="h-3 w-24 animate-pulse rounded bg-muted/15" />
             </div>
-            {/* Skeleton cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
-                  className="animate-card-enter rounded-xl border border-border/20 bg-card/15 p-5"
-                  style={{ animationDelay: `${i * 60}ms` }}
+                  className="animate-card-enter rounded-lg border border-border/20 p-5"
+                  style={{ animationDelay: `${i * 50}ms` }}
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 rounded-full bg-muted/30 animate-shimmer" />
-                      <div className="h-2.5 w-12 rounded bg-muted/20 animate-shimmer" />
-                    </div>
-                    <div className="h-5 w-3/4 rounded bg-muted/25 animate-shimmer" />
-                    <div className="h-3 w-1/2 rounded bg-muted/15 animate-shimmer" />
+                  <div className="space-y-2.5">
+                    <div className="h-3 w-20 animate-pulse rounded bg-muted/15" />
+                    <div className="h-5 w-3/4 animate-pulse rounded bg-muted/20" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-muted/12" />
                     <div className="space-y-1.5">
-                      <div className="h-3 w-full rounded bg-muted/12 animate-shimmer" />
-                      <div className="h-3 w-5/6 rounded bg-muted/12 animate-shimmer" />
-                    </div>
-                    <div className="flex gap-1.5 pt-1">
-                      <div className="h-5 w-11 rounded-md bg-muted/15 animate-shimmer" />
-                      <div className="h-5 w-11 rounded-md bg-muted/15 animate-shimmer" />
+                      <div className="h-3 w-full animate-pulse rounded bg-muted/10" />
+                      <div className="h-3 w-5/6 animate-pulse rounded bg-muted/10" />
                     </div>
                   </div>
                 </div>
