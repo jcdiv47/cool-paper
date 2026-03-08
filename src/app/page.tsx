@@ -1,65 +1,125 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Header } from "@/components/header";
+import { PaperGrid } from "@/components/paper-grid";
+import { AddPaperDialog } from "@/components/add-paper-dialog";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { Toaster, toast } from "sonner";
+import type { PaperMetadata } from "@/types";
 
 export default function Home() {
+  const [papers, setPapers] = useState<PaperMetadata[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPapers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/papers");
+      const data = await res.json();
+      setPapers(data);
+    } catch {
+      toast.error("Failed to load papers");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPapers();
+  }, [fetchPapers]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setAddOpen(true);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  async function handleDelete(arxivId: string) {
+    const sanitized = arxivId.replace(/\//g, "_");
+    try {
+      await fetch(`/api/papers/${sanitized}`, { method: "DELETE" });
+      setPapers((prev) => prev.filter((p) => p.arxivId !== arxivId));
+      toast.success("Paper removed");
+    } catch {
+      toast.error("Failed to delete paper");
+    }
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+    <div className="min-h-screen bg-background">
+      <Toaster richColors position="bottom-right" />
+      <Header>
+        <Button
+          size="sm"
+          className="ml-auto gap-1.5"
+          onClick={() => setAddOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Add Paper
+          <kbd className="pointer-events-none ml-1 hidden h-5 select-none items-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1 font-mono text-[10px] font-medium opacity-60 sm:inline-flex">
+            ⌘K
+          </kbd>
+        </Button>
+      </Header>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        {loading ? (
+          <div className="space-y-6">
+            {/* Skeleton search */}
+            <div className="space-y-3">
+              <div className="h-11 w-full max-w-lg animate-shimmer rounded-xl border border-border/20 bg-card/15" />
+              <div className="h-3 w-32 animate-shimmer rounded bg-muted/20" />
+            </div>
+            {/* Skeleton cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="animate-card-enter rounded-xl border border-border/20 bg-card/15 p-5"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-muted/30 animate-shimmer" />
+                      <div className="h-2.5 w-12 rounded bg-muted/20 animate-shimmer" />
+                    </div>
+                    <div className="h-5 w-3/4 rounded bg-muted/25 animate-shimmer" />
+                    <div className="h-3 w-1/2 rounded bg-muted/15 animate-shimmer" />
+                    <div className="space-y-1.5">
+                      <div className="h-3 w-full rounded bg-muted/12 animate-shimmer" />
+                      <div className="h-3 w-5/6 rounded bg-muted/12 animate-shimmer" />
+                    </div>
+                    <div className="flex gap-1.5 pt-1">
+                      <div className="h-5 w-11 rounded-md bg-muted/15 animate-shimmer" />
+                      <div className="h-5 w-11 rounded-md bg-muted/15 animate-shimmer" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <PaperGrid
+            papers={papers}
+            onDelete={handleDelete}
+            onAdd={() => setAddOpen(true)}
+          />
+        )}
       </main>
+      <AddPaperDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdded={() => {
+          fetchPapers();
+          toast.success("Paper added successfully");
+        }}
+      />
     </div>
   );
 }
