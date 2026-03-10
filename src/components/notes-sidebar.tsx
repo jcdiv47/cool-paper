@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FileText, Loader2, PenLine, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useCachedFetch } from "@/hooks/use-cached-fetch";
 import type { NoteFile } from "@/types";
 
 interface NotesSidebarProps {
@@ -29,33 +30,25 @@ interface NotesSidebarProps {
 }
 
 export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, onSelectNote, onDeleteNote, onNotesLoaded }: NotesSidebarProps) {
-  const [notes, setNotes] = useState<NoteFile[]>([]);
+  const { data: fetchedNotes, loading, refetch: fetchNotes } = useCachedFetch<NoteFile[]>(
+    `/api/papers/${paperId}/notes`,
+    { cacheKey: `paper:notes:${paperId}` }
+  );
+
+  const notes = fetchedNotes ?? [];
   const [displayNotes, setDisplayNotes] = useState<NoteFile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const fetchNotes = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/papers/${paperId}/notes`);
-      const data = await res.json();
-      setNotes(data);
-      setDisplayNotes(data);
-      onNotesLoaded?.(data);
-    } catch {
-      setNotes([]);
-      setDisplayNotes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [paperId]);
-
+  // Sync displayNotes and notify parent when fetched notes change
   useEffect(() => {
-    fetchNotes();
-  }, [fetchNotes]);
+    if (fetchedNotes) {
+      setDisplayNotes(fetchedNotes);
+      onNotesLoaded?.(fetchedNotes);
+    }
+  }, [fetchedNotes]);
 
   const handleSearch = useCallback(
     (q: string) => {

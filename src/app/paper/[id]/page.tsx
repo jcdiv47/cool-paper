@@ -2,17 +2,42 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/header";
-import { PdfViewer } from "@/components/pdf-viewer";
 import { NotesSidebar } from "@/components/notes-sidebar";
-import { NoteViewer } from "@/components/note-viewer";
+import { SummaryView } from "@/components/summary-view";
 import { GenerateNoteDialog } from "@/components/generate-note-dialog";
 import { useGenerateJob } from "@/hooks/use-generate-job";
+import { useCachedFetch } from "@/hooks/use-cached-fetch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, BookOpen } from "lucide-react";
+import { FileText, BookOpen, AlignLeft } from "lucide-react";
 import { Toaster } from "sonner";
 import type { PaperMetadata, NoteFile } from "@/types";
+
+function PdfSkeleton() {
+  return <div className="flex h-full items-center justify-center bg-muted/20 animate-pulse" />;
+}
+
+function NoteSkeleton() {
+  return (
+    <div className="mx-auto max-w-3xl space-y-3 px-4 py-8 sm:px-8">
+      <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-5/6 animate-pulse rounded bg-muted" />
+    </div>
+  );
+}
+
+const LazyPdfViewer = dynamic(
+  () => import("@/components/pdf-viewer").then((m) => ({ default: m.PdfViewer })),
+  { ssr: false, loading: () => <PdfSkeleton /> }
+);
+
+const LazyNoteViewer = dynamic(
+  () => import("@/components/note-viewer").then((m) => ({ default: m.NoteViewer })),
+  { ssr: false, loading: () => <NoteSkeleton /> }
+);
 
 export default function PaperPage({
   params,
@@ -22,16 +47,38 @@ export default function PaperPage({
   const { id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [paper, setPaper] = useState<PaperMetadata | null>(null);
-  const [loading, setLoading] = useState(true);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [notesKey, setNotesKey] = useState(0);
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
-  const [view, setView] = useState<"pdf" | "note">(
-    searchParams.get("tab") === "notes" ? "note" : "pdf"
+  const [view, setView] = useState<"summary" | "pdf" | "note">(
+    searchParams.get("tab") === "notes"
+      ? "note"
+      : searchParams.get("tab") === "pdf"
+        ? "pdf"
+        : "summary"
   );
   const [notes, setNotes] = useState<NoteFile[]>([]);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+
+  // Track which tabs have been visited (lazy mount)
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => {
+    const initial = new Set(["summary"]);
+    const tab = searchParams.get("tab");
+    if (tab === "pdf") initial.add("pdf");
+    if (tab === "notes") initial.add("note");
+    return initial;
+  });
+
+  // Mark tab as visited when switching
+  const switchView = useCallback((v: "summary" | "pdf" | "note") => {
+    setVisitedTabs((prev) => {
+      if (prev.has(v)) return prev;
+      const next = new Set(prev);
+      next.add(v);
+      return next;
+    });
+    setView(v);
+  }, []);
 
   const refreshNotes = useCallback(() => {
     setNotesKey((k) => k + 1);
@@ -39,24 +86,22 @@ export default function PaperPage({
 
   const job = useGenerateJob(id, refreshNotes);
 
+  // Cached paper metadata fetch
+  const { data: paper, loading } = useCachedFetch<PaperMetadata>(
+    `/api/papers/${id}`,
+    { cacheKey: `paper:meta:${id}`, cacheOnly: true }
+  );
+
+  // Redirect home if paper not found after loading
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/papers/${id}`);
-        if (!res.ok) throw new Error();
-        setPaper(await res.json());
-      } catch {
-        router.push("/");
-      } finally {
-        setLoading(false);
-      }
+    if (!loading && !paper) {
+      router.push("/");
     }
-    load();
-  }, [id, router]);
+  }, [loading, paper, router]);
 
   function handleSelectNote(filename: string) {
     setSelectedNote(filename);
-    setView("note");
+    switchView("note");
   }
 
   if (loading) {
@@ -91,10 +136,19 @@ export default function PaperPage({
         <div className="flex-1" />
         <div className="flex shrink-0 items-center rounded-lg border border-border/40 p-0.5">
           <Button
+            variant={view === "summary" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => switchView("summary")}
+          >
+            <AlignLeft className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Summary</span>
+          </Button>
+          <Button
             variant={view === "pdf" ? "secondary" : "ghost"}
             size="sm"
             className="h-7 gap-1.5 text-xs"
-            onClick={() => setView("pdf")}
+            onClick={() => switchView("pdf")}
           >
             <BookOpen className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">PDF</span>
@@ -108,7 +162,7 @@ export default function PaperPage({
               if (!selectedNote && notes.length > 0) {
                 setSelectedNote(notes[0].filename);
               }
-              setView("note");
+              switchView("note");
             }}
           >
             <FileText className="h-3.5 w-3.5" />
@@ -118,14 +172,19 @@ export default function PaperPage({
       </Header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Main content area: PDF always mounted, note overlays it */}
+        {/* Main content area: views stacked with visibility toggling */}
         <div className="relative min-h-0 flex-1">
-          <div className={view === "pdf" || !selectedNote ? "h-full" : "invisible absolute inset-0"}>
-            <PdfViewer paperId={id} />
+          <div className={view === "summary" ? "h-full" : "invisible absolute inset-0"}>
+            <SummaryView paper={paper} />
           </div>
-          {selectedNote && (
+          {visitedTabs.has("pdf") && (
+            <div className={view === "pdf" ? "h-full" : "invisible absolute inset-0"}>
+              <LazyPdfViewer paperId={id} />
+            </div>
+          )}
+          {selectedNote && visitedTabs.has("note") && (
             <div className={view === "note" ? "h-full" : "invisible absolute inset-0"}>
-              <NoteViewer
+              <LazyNoteViewer
                 paperId={id}
                 filename={selectedNote}
               />
@@ -168,7 +227,7 @@ export default function PaperPage({
               );
               if (selectedNote === filename) {
                 setSelectedNote(null);
-                setView("pdf");
+                switchView("summary");
               }
               refreshNotes();
             }}

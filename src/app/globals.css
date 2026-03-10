@@ -166,3 +166,21 @@
 .rpv-core__annotation-layer .rpv-core__annotation--link {
   display: none;
 }
+
+/* Cal-heatmap dark theme */
+.cal-heatmap-container rect:not([fill]) {
+  fill: var(--secondary) !important;
+}
+.cal-heatmap-container text {
+  fill: var(--muted-foreground) !important;
+  font-size: 11px !important;
+}
+#ch-tooltip {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  padding: 6px 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}

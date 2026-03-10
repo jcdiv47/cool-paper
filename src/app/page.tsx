@@ -3,16 +3,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/header";
 import { PaperGrid } from "@/components/paper-grid";
+import { ActivityHeatmap } from "@/components/activity-heatmap";
+import { StatsBlock } from "@/components/stats-block";
 import { AddPaperDialog } from "@/components/add-paper-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { removeByPrefix } from "@/lib/cache";
 import type { PaperMetadata } from "@/types";
 
 export default function Home() {
   const [papers, setPapers] = useState<PaperMetadata[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const fetchPapers = useCallback(async () => {
     try {
@@ -45,6 +49,9 @@ export default function Home() {
     const sanitized = arxivId.replace(/\//g, "_");
     try {
       await fetch(`/api/papers/${sanitized}`, { method: "DELETE" });
+      removeByPrefix(`paper:meta:${sanitized}`);
+      removeByPrefix(`paper:notes:${sanitized}`);
+      removeByPrefix(`paper:note:${sanitized}`);
       setPapers((prev) => prev.filter((p) => p.arxivId !== arxivId));
       toast.success("Paper removed");
     } catch {
@@ -55,7 +62,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="bottom-right" />
-      <Header>
+      <Header search={search} onSearchChange={setSearch}>
         <Button
           size="sm"
           className="ml-auto gap-1.5"
@@ -96,11 +103,20 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <PaperGrid
-            papers={papers}
-            onDelete={handleDelete}
-            onAdd={() => setAddOpen(true)}
-          />
+          <div className="space-y-8">
+            {papers.length > 0 && (
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <StatsBlock papers={papers} />
+                <ActivityHeatmap papers={papers} />
+              </div>
+            )}
+            <PaperGrid
+              papers={papers}
+              onDelete={handleDelete}
+              onAdd={() => setAddOpen(true)}
+              search={search}
+            />
+          </div>
         )}
       </main>
       <AddPaperDialog

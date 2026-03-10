@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { PaperCard } from "./paper-card";
-import { Input } from "@/components/ui/input";
 import { Search, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PaperMetadata, NoteFile } from "@/types";
@@ -11,10 +10,10 @@ interface PaperGridProps {
   papers: PaperMetadata[];
   onDelete: (arxivId: string) => void;
   onAdd: () => void;
+  search: string;
 }
 
-export function PaperGrid({ papers, onDelete, onAdd }: PaperGridProps) {
-  const [search, setSearch] = useState("");
+export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
   const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -71,25 +70,6 @@ export function PaperGrid({ papers, onDelete, onAdd }: PaperGridProps) {
 
   return (
     <div className="space-y-6">
-      {/* Search + stats */}
-      <div className="space-y-2">
-        <div className="relative sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search papers..."
-            className="h-10 pl-10 text-sm"
-          />
-        </div>
-        <p className="text-xs text-muted-foreground/40">
-          {filtered.length} {filtered.length === 1 ? "paper" : "papers"}
-          {search && ` matching "${search}"`}
-          {!search && " in library"}
-        </p>
-      </div>
-
-      {/* Grid */}
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <Search className="h-6 w-6 text-muted-foreground/20" />

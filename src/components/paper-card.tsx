@@ -58,7 +58,7 @@ export function PaperCard({
         style={{ animationDelay: `${index * 50}ms` }}
       >
         <Card className="group h-full border-border/40 bg-card/40 transition-colors duration-200 hover:border-border hover:bg-card/70">
-          <div className="space-y-2.5 p-5">
+          <div className="space-y-2 px-5 py-3.5">
             {/* Meta row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
@@ -93,7 +93,7 @@ export function PaperCard({
             </p>
 
             {/* Abstract */}
-            <p className="line-clamp-2 text-[13px] leading-relaxed text-muted-foreground/50">
+            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/50">
               {abstractExcerpt}
             </p>
 

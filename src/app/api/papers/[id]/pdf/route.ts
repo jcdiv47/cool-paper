@@ -16,6 +16,7 @@ export async function GET(
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": "inline",
+        "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch {

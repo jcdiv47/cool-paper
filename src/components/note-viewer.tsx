@@ -1,39 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+import { useCachedFetch } from "@/hooks/use-cached-fetch";
 
 interface NoteViewerProps {
   paperId: string;
   filename: string;
 }
 
-export function NoteViewer({ paperId, filename }: NoteViewerProps) {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+interface NoteData {
+  content: string;
+}
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/papers/${paperId}/notes/${encodeURIComponent(filename)}`
-        );
-        const data = await res.json();
-        setContent(data.content);
-      } catch {
-        setContent("Failed to load note.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [paperId, filename]);
+export function NoteViewer({ paperId, filename }: NoteViewerProps) {
+  const { data, loading } = useCachedFetch<NoteData>(
+    `/api/papers/${paperId}/notes/${encodeURIComponent(filename)}`,
+    { cacheKey: `paper:note:${paperId}:${filename}` }
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -51,7 +39,7 @@ export function NoteViewer({ paperId, filename }: NoteViewerProps) {
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeHighlight, rehypeKatex]}
             >
-              {content || ""}
+              {data?.content || ""}
             </ReactMarkdown>
           </article>
         )}
