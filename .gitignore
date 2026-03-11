@@ -38,6 +38,9 @@ yarn-error.log*
 
 # paper cache
 .cache/
+!.cache/.claude/
+!.cache/.claude/skills/
+!.cache/.claude/skills/**
 
 # typescript
 *.tsbuildinfo
