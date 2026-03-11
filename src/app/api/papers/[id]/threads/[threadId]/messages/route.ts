@@ -8,7 +8,7 @@ import {
   extractThinkingDelta,
 } from "@/lib/agent";
 import type { ResolvedAgentQuery } from "@/lib/agent";
-import type { Thread, ThreadMessage } from "@/types";
+import type { ThreadMessage } from "@/types";
 
 export const dynamic = "force-dynamic";
 

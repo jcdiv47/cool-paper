@@ -31,7 +31,7 @@ export function extractArxivId(input: string): string | null {
   // Try extracting from URL
   const match = trimmed.match(ARXIV_URL_REGEX);
   if (match) {
-    return match[1];
+    return match[1]!;
   }
 
   return null;

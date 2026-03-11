@@ -208,7 +208,7 @@ export default function PaperPage({
             disabled={notes.length === 0}
             onClick={() => {
               if (!selectedNote && notes.length > 0) {
-                setSelectedNote(notes[0].filename);
+                setSelectedNote(notes[0]!.filename);
               }
               switchView("note");
             }}
@@ -311,7 +311,7 @@ export default function PaperPage({
                 !selectedNote &&
                 loaded.length > 0
               ) {
-                setSelectedNote(loaded[0].filename);
+                setSelectedNote(loaded[0]!.filename);
               }
             }}
             onSelectThread={(threadId) => {
