@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPaper } from "@/lib/papers";
+import { sanitizeArxivId } from "@/lib/constants";
+import { setNoteMeta } from "@/lib/notes";
 import {
-  getAgentQueryConfig,
-  startAgentQuery,
+  resolveAgentQuery,
+  executeAgentQuery,
   extractTextFromMessage,
 } from "@/lib/agent";
 import type { GenerateRequest } from "@/types";
@@ -11,14 +13,20 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body: GenerateRequest = await request.json();
-  const { paperId, prompt, noteFilename } = body;
+  const { paperId, prompt, noteFilename, taskType, model } = body;
 
   const paper = await getPaper(paperId);
   if (!paper) {
     return NextResponse.json({ error: "Paper not found" }, { status: 404 });
   }
 
-  const config = getAgentQueryConfig(paper, prompt, noteFilename);
+  const resolved = resolveAgentQuery({
+    paper,
+    promptInput: prompt,
+    noteFilename,
+    taskType,
+    optionOverrides: model ? { model } : undefined,
+  });
   const abortController = new AbortController();
 
   const stream = new ReadableStream({
@@ -37,11 +45,11 @@ export async function POST(request: Request) {
 
       send({
         type: "command",
-        command: `claude -p '...' --model ${config.model ?? "haiku"} --allowedTools "Read,Write,Glob" [via Agent SDK]`,
+        command: resolved.displayCommand,
       });
 
       try {
-        const messageIterator = startAgentQuery(config, abortController);
+        const messageIterator = executeAgentQuery(resolved, abortController);
 
         for await (const message of messageIterator) {
           if (message.type === "system" && message.subtype === "init") {
@@ -63,6 +71,10 @@ export async function POST(request: Request) {
                 type: "stdout",
                 text: `\n\n[Completed in ${(message.duration_ms / 1000).toFixed(1)}s, cost: $${message.total_cost_usd.toFixed(4)}]\n`,
               });
+              // Save model metadata for this note
+              setNoteMeta(sanitizeArxivId(paperId), noteFilename, {
+                model: resolved.options.model,
+              }).catch(() => {});
               send({ type: "done", exitCode: 0 });
             } else {
               send({

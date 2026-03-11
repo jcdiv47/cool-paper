@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -17,6 +18,7 @@ import {
 import { FileText, Loader2, PenLine, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCachedFetch } from "@/hooks/use-cached-fetch";
+import { MODEL_OPTIONS } from "@/lib/models";
 import type { NoteFile } from "@/types";
 
 interface NotesSidebarProps {
@@ -181,9 +183,14 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
                     }`} />
                     <div className="w-0 flex-1">
                       <p className="truncate text-sm font-medium">{note.title}</p>
-                      <p className="text-xs text-muted-foreground/60">
-                        {new Date(note.modifiedAt).toLocaleString()}
-                      </p>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+                        <span>{new Date(note.modifiedAt).toLocaleString()}</span>
+                        {note.model && (
+                          <Badge variant="outline" className="px-1.5 py-0 text-[10px] font-normal">
+                            {MODEL_OPTIONS.find((m) => m.id === note.model)?.label ?? note.model}
+                          </Badge>
+                        )}
+                      </div>
                       {note.snippet && (
                         <p className="mt-0.5 truncate text-xs text-muted-foreground/80 italic">
                           {note.snippet}

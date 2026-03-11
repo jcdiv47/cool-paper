@@ -13,9 +13,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Copy, Check, Terminal, PenLine } from "lucide-react";
 import { QUICK_PROMPTS, PROMPT_TEMPLATES } from "@/lib/quick-prompts";
+import { MODEL_OPTIONS, DEFAULT_MODEL } from "@/lib/models";
 import type { PaperMetadata } from "@/types";
+import type { TaskType } from "@/lib/agent";
 
 interface GenerateNoteDialogProps {
   open: boolean;
@@ -24,7 +33,7 @@ interface GenerateNoteDialogProps {
   generating: boolean;
   output: string;
   cliCommand: string;
-  onStartJob: (prompt: string, noteFilename: string) => void;
+  onStartJob: (prompt: string, noteFilename: string, taskType?: TaskType, model?: string) => void;
   onCancelJob: () => void;
 }
 
@@ -40,6 +49,7 @@ export function GenerateNoteDialog({
 }: GenerateNoteDialogProps) {
   const [prompt, setPrompt] = useState("");
   const [noteFilename, setNoteFilename] = useState("summary.md");
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [copied, setCopied] = useState(false);
   const outputRef = useRef<HTMLPreElement>(null);
 
@@ -56,7 +66,7 @@ export function GenerateNoteDialog({
 
   function handleGenerate() {
     if (!prompt.trim()) return;
-    onStartJob(prompt.trim(), noteFilename);
+    onStartJob(prompt.trim(), noteFilename, undefined, model);
   }
 
   async function handleCopyCommand() {
@@ -155,7 +165,21 @@ export function GenerateNoteDialog({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
+        <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+          <Select value={model} onValueChange={setModel} disabled={generating}>
+            <SelectTrigger size="sm" className="w-auto text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODEL_OPTIONS.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.label}
+                  <span className="ml-1 text-muted-foreground">{m.description}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex-1" />
           {generating ? (
             <>
               <Button

@@ -4,16 +4,17 @@ import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/header";
-import { NotesSidebar } from "@/components/notes-sidebar";
+import { PaperSidebar } from "@/components/paper-sidebar";
 import { SummaryView } from "@/components/summary-view";
 import { GenerateNoteDialog } from "@/components/generate-note-dialog";
 import { useGenerateJob } from "@/hooks/use-generate-job";
+import { useChat } from "@/hooks/use-chat";
 import { useCachedFetch } from "@/hooks/use-cached-fetch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, BookOpen, AlignLeft } from "lucide-react";
+import { FileText, BookOpen, AlignLeft, MessageCircle } from "lucide-react";
 import { Toaster } from "sonner";
-import type { PaperMetadata, NoteFile } from "@/types";
+import type { PaperMetadata, NoteFile, ThreadListItem } from "@/types";
 
 function PdfSkeleton() {
   return <div className="flex h-full items-center justify-center bg-muted/20 animate-pulse" />;
@@ -39,6 +40,11 @@ const LazyNoteViewer = dynamic(
   { ssr: false, loading: () => <NoteSkeleton /> }
 );
 
+const LazyChatView = dynamic(
+  () => import("@/components/chat-view").then((m) => ({ default: m.ChatView })),
+  { ssr: false, loading: () => <NoteSkeleton /> }
+);
+
 export default function PaperPage({
   params,
 }: {
@@ -49,8 +55,10 @@ export default function PaperPage({
   const searchParams = useSearchParams();
   const [generateOpen, setGenerateOpen] = useState(false);
   const [notesKey, setNotesKey] = useState(0);
+  const [threadsKey, setThreadsKey] = useState(0);
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
-  const [view, setView] = useState<"summary" | "pdf" | "note">(
+  const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  const [view, setView] = useState<"summary" | "pdf" | "note" | "chat">(
     searchParams.get("tab") === "notes"
       ? "note"
       : searchParams.get("tab") === "pdf"
@@ -58,7 +66,10 @@ export default function PaperPage({
         : "summary"
   );
   const [notes, setNotes] = useState<NoteFile[]>([]);
+  const [threads, setThreads] = useState<ThreadListItem[]>([]);
   const [mobileSidebar, setMobileSidebar] = useState(false);
+
+  const chat = useChat(id);
 
   // Track which tabs have been visited (lazy mount)
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => {
@@ -70,7 +81,7 @@ export default function PaperPage({
   });
 
   // Mark tab as visited when switching
-  const switchView = useCallback((v: "summary" | "pdf" | "note") => {
+  const switchView = useCallback((v: "summary" | "pdf" | "note" | "chat") => {
     setVisitedTabs((prev) => {
       if (prev.has(v)) return prev;
       const next = new Set(prev);
@@ -82,6 +93,10 @@ export default function PaperPage({
 
   const refreshNotes = useCallback(() => {
     setNotesKey((k) => k + 1);
+  }, []);
+
+  const refreshThreads = useCallback(() => {
+    setThreadsKey((k) => k + 1);
   }, []);
 
   const job = useGenerateJob(id, refreshNotes);
@@ -103,6 +118,39 @@ export default function PaperPage({
     setSelectedNote(filename);
     switchView("note");
   }
+
+  function handleSelectThread(threadId: string) {
+    setSelectedThread(threadId);
+    chat.loadThread(threadId);
+    switchView("chat");
+  }
+
+  function handleNewThread() {
+    setSelectedThread(null);
+    chat.clearThread();
+    switchView("chat");
+    setMobileSidebar(false);
+  }
+
+  async function handleDeleteThread(threadId: string) {
+    await fetch(`/api/papers/${id}/threads/${threadId}`, {
+      method: "DELETE",
+    });
+    if (selectedThread === threadId) {
+      setSelectedThread(null);
+      chat.clearThread();
+      switchView("summary");
+    }
+    refreshThreads();
+  }
+
+  // Refresh threads list when streaming completes (new thread or new messages)
+  useEffect(() => {
+    if (!chat.isStreaming && chat.threadId) {
+      setSelectedThread(chat.threadId);
+      refreshThreads();
+    }
+  }, [chat.isStreaming, chat.threadId, refreshThreads]);
 
   if (loading) {
     return (
@@ -168,6 +216,15 @@ export default function PaperPage({
             <FileText className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Note</span>
           </Button>
+          <Button
+            variant={view === "chat" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => switchView("chat")}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Chat</span>
+          </Button>
         </div>
       </Header>
 
@@ -190,6 +247,20 @@ export default function PaperPage({
               />
             </div>
           )}
+          {visitedTabs.has("chat") && (
+            <div className={view === "chat" ? "h-full" : "invisible absolute inset-0"}>
+              <LazyChatView
+                messages={chat.messages}
+                isStreaming={chat.isStreaming}
+                isThinking={chat.isThinking}
+                error={chat.error}
+                onSendMessage={chat.sendMessage}
+                onCancel={chat.cancelStream}
+                model={chat.model}
+                onModelChange={chat.setModel}
+              />
+            </div>
+          )}
         </div>
 
         {/* Mobile backdrop */}
@@ -198,20 +269,22 @@ export default function PaperPage({
           onClick={() => setMobileSidebar(false)}
         />
 
-        {/* Notes sidebar - bottom sheet on mobile, inline on desktop */}
+        {/* Sidebar - bottom sheet on mobile, inline on desktop */}
         <div className={`
           fixed bottom-0 left-0 right-0 z-50 flex h-[70vh] flex-col rounded-t-xl border-t border-border/40 bg-background transition-transform duration-300
           md:relative md:z-auto md:flex md:h-auto md:w-96 md:translate-y-0 md:rounded-none md:border-l md:border-t-0 md:transition-none
           ${mobileSidebar ? "translate-y-0" : "translate-y-full md:translate-y-0"}
         `}>
-          <button onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close notes">
+          <button onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
             <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
           </button>
-          <NotesSidebar
-            key={notesKey}
+          <PaperSidebar
             paperId={id}
+            notesKey={notesKey}
             generating={job.generating}
             selectedNote={selectedNote}
+            selectedThread={selectedThread}
+            threadsKey={threadsKey}
             onGenerate={() => {
               setMobileSidebar(false);
               setGenerateOpen(true);
@@ -241,20 +314,27 @@ export default function PaperPage({
                 setSelectedNote(loaded[0].filename);
               }
             }}
+            onSelectThread={(threadId) => {
+              handleSelectThread(threadId);
+              setMobileSidebar(false);
+            }}
+            onNewThread={handleNewThread}
+            onDeleteThread={handleDeleteThread}
+            onThreadsLoaded={setThreads}
           />
         </div>
       </div>
 
-      {/* Mobile FAB to access notes sidebar */}
+      {/* Mobile FAB to access sidebar */}
       <button
         className={`fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
         onClick={() => setMobileSidebar(true)}
-        aria-label="Open notes"
+        aria-label="Open sidebar"
       >
         <FileText className="h-4.5 w-4.5 text-foreground" />
-        {notes.length > 0 && (
+        {(notes.length + threads.length) > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
-            {notes.length}
+            {notes.length + threads.length}
           </span>
         )}
       </button>

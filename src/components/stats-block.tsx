@@ -52,7 +52,7 @@ export function StatsBlock({ papers }: StatsBlockProps) {
           className="animate-card-enter flex items-center gap-2.5"
           style={{ animationDelay: `${i * 80}ms` }}
         >
-          <s.icon className="h-4 w-4 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
+          <s.icon className="h-5 w-5 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
           <div className="font-serif text-3xl tabular-nums tracking-tight text-foreground">
             {s.value === null ? (
               <span className="inline-block h-8 w-6 animate-pulse rounded bg-muted/15" />
@@ -60,7 +60,7 @@ export function StatsBlock({ papers }: StatsBlockProps) {
               s.value
             )}
           </div>
-          <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">
+          <div className="text-sm uppercase tracking-widest text-muted-foreground/70">
             {s.label}
           </div>
         </div>

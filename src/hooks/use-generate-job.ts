@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import type { TaskType } from "@/lib/agent";
 
 export interface GenerateJobState {
   generating: boolean;
@@ -18,7 +19,7 @@ export function useGenerateJob(
   const abortRef = useRef<AbortController | null>(null);
 
   const startJob = useCallback(
-    async (prompt: string, noteFilename: string) => {
+    async (prompt: string, noteFilename: string, taskType?: TaskType, model?: string) => {
       if (!prompt.trim()) return;
 
       setGenerating(true);
@@ -35,6 +36,8 @@ export function useGenerateJob(
             paperId,
             prompt: prompt.trim(),
             noteFilename,
+            taskType,
+            model,
           }),
           signal: abortRef.current.signal,
         });

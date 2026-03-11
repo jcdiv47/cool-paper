@@ -7,11 +7,45 @@ function notesDir(sanitizedId: string): string {
   return path.join(paperDir(sanitizedId), "notes");
 }
 
+interface NotesMeta {
+  [filename: string]: { model?: string };
+}
+
+function metaPath(sanitizedId: string): string {
+  return path.join(notesDir(sanitizedId), ".meta.json");
+}
+
+async function readMeta(sanitizedId: string): Promise<NotesMeta> {
+  try {
+    const raw = await fs.readFile(metaPath(sanitizedId), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+async function writeMeta(sanitizedId: string, meta: NotesMeta): Promise<void> {
+  const dir = notesDir(sanitizedId);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(metaPath(sanitizedId), JSON.stringify(meta, null, 2));
+}
+
+export async function setNoteMeta(
+  sanitizedId: string,
+  filename: string,
+  data: { model?: string }
+): Promise<void> {
+  const meta = await readMeta(sanitizedId);
+  meta[filename] = { ...meta[filename], ...data };
+  await writeMeta(sanitizedId, meta);
+}
+
 export async function listNotes(sanitizedId: string): Promise<NoteFile[]> {
   const dir = notesDir(sanitizedId);
   try {
     await fs.mkdir(dir, { recursive: true });
     const files = await fs.readdir(dir);
+    const meta = await readMeta(sanitizedId);
     const notes: NoteFile[] = [];
 
     for (const file of files) {
@@ -21,6 +55,7 @@ export async function listNotes(sanitizedId: string): Promise<NoteFile[]> {
         filename: file,
         title: file.replace(/\.md$/, "").replace(/[-_]/g, " "),
         modifiedAt: stat.mtime.toISOString(),
+        model: meta[file]?.model,
       });
     }
 
