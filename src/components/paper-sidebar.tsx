@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { NotesSidebar } from "./notes-sidebar";
 import { ThreadsSidebar } from "./threads-sidebar";
-import type { NoteFile, ThreadListItem } from "@/types";
+import type { ThreadListItem } from "@/types";
 
 interface PaperSidebarProps {
   paperId: string;
+  mode: "notes" | "threads";
   notesKey: number;
   generating: boolean;
   selectedNote: string | null;
@@ -16,7 +15,6 @@ interface PaperSidebarProps {
   onGenerate: () => void;
   onSelectNote: (filename: string) => void;
   onDeleteNote: (filename: string) => void;
-  onNotesLoaded: (notes: NoteFile[]) => void;
   onSelectThread: (threadId: string) => void;
   onNewThread: () => void;
   onDeleteThread: (threadId: string) => void;
@@ -25,6 +23,7 @@ interface PaperSidebarProps {
 
 export function PaperSidebar({
   paperId,
+  mode,
   notesKey,
   generating,
   selectedNote,
@@ -33,39 +32,13 @@ export function PaperSidebar({
   onGenerate,
   onSelectNote,
   onDeleteNote,
-  onNotesLoaded,
   onSelectThread,
   onNewThread,
   onDeleteThread,
   onThreadsLoaded,
 }: PaperSidebarProps) {
-  const [mode, setMode] = useState<"notes" | "threads">("notes");
-
   return (
     <div className="flex h-full flex-col">
-      {/* Mode toggle */}
-      <div className="flex items-center justify-center border-b border-border/40 px-4 py-2">
-        <div className="flex items-center rounded-lg border border-border/40 p-0.5">
-          <Button
-            variant={mode === "notes" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setMode("notes")}
-          >
-            Notes
-          </Button>
-          <Button
-            variant={mode === "threads" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => setMode("threads")}
-          >
-            Threads
-          </Button>
-        </div>
-      </div>
-
-      {/* Content */}
       <div className="min-h-0 flex-1">
         {mode === "notes" ? (
           <NotesSidebar
@@ -76,7 +49,6 @@ export function PaperSidebar({
             onGenerate={onGenerate}
             onSelectNote={onSelectNote}
             onDeleteNote={onDeleteNote}
-            onNotesLoaded={onNotesLoaded}
           />
         ) : (
           <ThreadsSidebar

@@ -65,11 +65,28 @@ export default function PaperPage({
         ? "pdf"
         : "summary"
   );
-  const [notes, setNotes] = useState<NoteFile[]>([]);
   const [threads, setThreads] = useState<ThreadListItem[]>([]);
   const [mobileSidebar, setMobileSidebar] = useState(false);
 
   const chat = useChat(id);
+
+  // Fetch notes at page level so the Note tab button can be disabled when empty
+  const { data: fetchedNotes } = useCachedFetch<NoteFile[]>(
+    `/api/papers/${id}/notes`,
+    { cacheKey: `paper:notes:${id}`, invalidateKey: notesKey }
+  );
+  const notes = fetchedNotes ?? [];
+
+  // Auto-select first note when arriving via ?tab=notes
+  useEffect(() => {
+    if (
+      searchParams.get("tab") === "notes" &&
+      !selectedNote &&
+      notes.length > 0
+    ) {
+      setSelectedNote(notes[0]!.filename);
+    }
+  }, [notes, searchParams, selectedNote]);
 
   // Track which tabs have been visited (lazy mount)
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => {
@@ -263,81 +280,78 @@ export default function PaperPage({
           )}
         </div>
 
-        {/* Mobile backdrop */}
-        <div
-          className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${mobileSidebar ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-          onClick={() => setMobileSidebar(false)}
-        />
+        {(view === "note" || view === "chat") && (
+          <>
+            {/* Mobile backdrop */}
+            <div
+              className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${mobileSidebar ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+              onClick={() => setMobileSidebar(false)}
+            />
 
-        {/* Sidebar - bottom sheet on mobile, inline on desktop */}
-        <div className={`
-          fixed bottom-0 left-0 right-0 z-50 flex h-[70vh] flex-col rounded-t-xl border-t border-border/40 bg-background transition-transform duration-300
-          md:relative md:z-auto md:flex md:h-auto md:w-96 md:translate-y-0 md:rounded-none md:border-l md:border-t-0 md:transition-none
-          ${mobileSidebar ? "translate-y-0" : "translate-y-full md:translate-y-0"}
-        `}>
-          <button onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
-            <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
-          </button>
-          <PaperSidebar
-            paperId={id}
-            notesKey={notesKey}
-            generating={job.generating}
-            selectedNote={selectedNote}
-            selectedThread={selectedThread}
-            threadsKey={threadsKey}
-            onGenerate={() => {
-              setMobileSidebar(false);
-              setGenerateOpen(true);
-            }}
-            onSelectNote={(filename) => {
-              handleSelectNote(filename);
-              setMobileSidebar(false);
-            }}
-            onDeleteNote={async (filename) => {
-              await fetch(
-                `/api/papers/${id}/notes/${encodeURIComponent(filename)}`,
-                { method: "DELETE" }
-              );
-              if (selectedNote === filename) {
-                setSelectedNote(null);
-                switchView("summary");
-              }
-              refreshNotes();
-            }}
-            onNotesLoaded={(loaded) => {
-              setNotes(loaded);
-              if (
-                searchParams.get("tab") === "notes" &&
-                !selectedNote &&
-                loaded.length > 0
-              ) {
-                setSelectedNote(loaded[0]!.filename);
-              }
-            }}
-            onSelectThread={(threadId) => {
-              handleSelectThread(threadId);
-              setMobileSidebar(false);
-            }}
-            onNewThread={handleNewThread}
-            onDeleteThread={handleDeleteThread}
-            onThreadsLoaded={setThreads}
-          />
-        </div>
+            {/* Sidebar - bottom sheet on mobile, inline on desktop */}
+            <div className={`
+              fixed bottom-0 left-0 right-0 z-50 flex h-[70vh] flex-col rounded-t-xl border-t border-border/40 bg-background transition-transform duration-300
+              md:relative md:z-auto md:flex md:h-auto md:w-96 md:translate-y-0 md:rounded-none md:border-l md:border-t-0 md:transition-none
+              ${mobileSidebar ? "translate-y-0" : "translate-y-full md:translate-y-0"}
+            `}>
+              <button onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
+                <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
+              </button>
+              <PaperSidebar
+                paperId={id}
+                mode={view === "note" ? "notes" : "threads"}
+                notesKey={notesKey}
+                generating={job.generating}
+                selectedNote={selectedNote}
+                selectedThread={selectedThread}
+                threadsKey={threadsKey}
+                onGenerate={() => {
+                  setMobileSidebar(false);
+                  setGenerateOpen(true);
+                }}
+                onSelectNote={(filename) => {
+                  handleSelectNote(filename);
+                  setMobileSidebar(false);
+                }}
+                onDeleteNote={async (filename) => {
+                  await fetch(
+                    `/api/papers/${id}/notes/${encodeURIComponent(filename)}`,
+                    { method: "DELETE" }
+                  );
+                  if (selectedNote === filename) {
+                    setSelectedNote(null);
+                    switchView("summary");
+                  }
+                  refreshNotes();
+                }}
+                onSelectThread={(threadId) => {
+                  handleSelectThread(threadId);
+                  setMobileSidebar(false);
+                }}
+                onNewThread={handleNewThread}
+                onDeleteThread={handleDeleteThread}
+                onThreadsLoaded={setThreads}
+              />
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Mobile FAB to access sidebar */}
-      <button
-        className={`fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
-        onClick={() => setMobileSidebar(true)}
-        aria-label="Open sidebar"
-      >
-        <FileText className="h-4.5 w-4.5 text-foreground" />
-        {(notes.length + threads.length) > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
-            {notes.length + threads.length}
-          </span>
-        )}
-      </button>
+      {/* Mobile FAB to access sidebar (only for note/chat tabs) */}
+      {(view === "note" || view === "chat") && (
+        <button
+          className={`fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          onClick={() => setMobileSidebar(true)}
+          aria-label="Open sidebar"
+        >
+          <FileText className="h-4.5 w-4.5 text-foreground" />
+          {(notes.length + threads.length) > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
+              {notes.length + threads.length}
+            </span>
+          )}
+        </button>
+      )}
 
       <GenerateNoteDialog
         open={generateOpen}
