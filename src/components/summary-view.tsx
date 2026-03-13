@@ -22,14 +22,14 @@ export function SummaryView({ paper }: SummaryViewProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-4xl px-6 py-12 sm:px-10 sm:py-20">
+        <div className="mx-auto max-w-4xl px-6 py-8 sm:px-10 sm:py-12">
           {/* Title */}
-          <h1 className="font-serif text-3xl leading-tight tracking-tight text-foreground sm:text-4xl md:text-[2.75rem] md:leading-[1.15]">
+          <h1 className="font-serif text-2xl leading-snug tracking-tight text-foreground sm:text-3xl md:text-[2.25rem] md:leading-[1.15]">
             {paper.title}
           </h1>
 
           {/* Metadata row: arXiv ID, categories, date */}
-          <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
             <a
               href={arxivUrl}
               target="_blank"
@@ -52,10 +52,10 @@ export function SummaryView({ paper }: SummaryViewProps) {
           </div>
 
           {/* Divider */}
-          <div className="my-8 h-px bg-gradient-to-r from-border/80 via-border/30 to-transparent" />
+          <div className="my-6 h-px bg-gradient-to-r from-border/80 via-border/30 to-transparent" />
 
           {/* Authors */}
-          <div className="mb-12">
+          <div className="mb-8">
             <p className="text-sm leading-relaxed text-muted-foreground/80">
               {(() => {
                 const full = paper.authors.join(", ");
