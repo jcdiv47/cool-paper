@@ -80,7 +80,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
               <Button
                 variant="ghost"
                 onClick={() => onSelect(sanitizedId)}
-                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/30 px-4 py-3 text-left font-normal hover:border-border/60 hover:bg-muted/20"
+                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/30 px-4 py-3 text-left font-normal whitespace-normal overflow-hidden hover:border-border/60 hover:bg-muted/20"
               >
                 <p className="text-sm font-medium leading-tight pr-8 line-clamp-2">
                   {paper.title}
