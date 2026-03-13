@@ -116,12 +116,14 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
           {searching ? (
             <Loader2 className="absolute right-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
           ) : search && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon-xs"
               onClick={() => handleSearch("")}
               className="absolute right-5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           )}
           <Input
             placeholder="Search notes…"
@@ -170,19 +172,20 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
             {displayNotes.map((note, i) => (
               <div key={note.filename}>
                 <div className="group relative">
-                  <button
+                  <Button
+                    variant="ghost"
                     onClick={() => onSelectNote(note.filename)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
+                    className={`flex h-auto w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left font-normal ${
                       selectedNote === note.filename
                         ? "bg-primary/10 ring-1 ring-primary/20 text-foreground"
-                        : "hover:bg-muted/60"
+                        : ""
                     }`}
                   >
                     <FileText className={`h-4 w-4 shrink-0 ${
                       selectedNote === note.filename ? "text-foreground" : "text-muted-foreground"
                     }`} />
                     <div className="w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{note.title}</p>
+                      <p className="truncate text-sm font-medium capitalize">{note.title}</p>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
                         <span>{new Date(note.modifiedAt).toLocaleString()}</span>
                         {note.model && (
@@ -197,7 +200,7 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
                         </p>
                       )}
                     </div>
-                  </button>
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

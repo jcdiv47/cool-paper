@@ -4,17 +4,16 @@ import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/header";
-import { PaperSidebar } from "@/components/paper-sidebar";
+import { NotesSidebar } from "@/components/notes-sidebar";
 import { SummaryView } from "@/components/summary-view";
 import { GenerateNoteDialog } from "@/components/generate-note-dialog";
 import { useGenerateJob } from "@/hooks/use-generate-job";
-import { useChat } from "@/hooks/use-chat";
 import { useCachedFetch } from "@/hooks/use-cached-fetch";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, BookOpen, AlignLeft, MessageCircle } from "lucide-react";
+import { FileText, BookOpen, AlignLeft, MessageCircle, PenLine } from "lucide-react";
 import { Toaster } from "sonner";
-import type { PaperMetadata, NoteFile, ThreadListItem } from "@/types";
+import type { PaperMetadata, NoteFile } from "@/types";
 
 function PdfSkeleton() {
   return <div className="flex h-full items-center justify-center bg-muted/20 animate-pulse" />;
@@ -40,11 +39,6 @@ const LazyNoteViewer = dynamic(
   { ssr: false, loading: () => <NoteSkeleton /> }
 );
 
-const LazyChatView = dynamic(
-  () => import("@/components/chat-view").then((m) => ({ default: m.ChatView })),
-  { ssr: false, loading: () => <NoteSkeleton /> }
-);
-
 export default function PaperPage({
   params,
 }: {
@@ -55,20 +49,15 @@ export default function PaperPage({
   const searchParams = useSearchParams();
   const [generateOpen, setGenerateOpen] = useState(false);
   const [notesKey, setNotesKey] = useState(0);
-  const [threadsKey, setThreadsKey] = useState(0);
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
-  const [selectedThread, setSelectedThread] = useState<string | null>(null);
-  const [view, setView] = useState<"summary" | "pdf" | "note" | "chat">(
+  const [view, setView] = useState<"summary" | "pdf" | "note">(
     searchParams.get("tab") === "notes"
       ? "note"
       : searchParams.get("tab") === "pdf"
         ? "pdf"
         : "summary"
   );
-  const [threads, setThreads] = useState<ThreadListItem[]>([]);
   const [mobileSidebar, setMobileSidebar] = useState(false);
-
-  const chat = useChat(id);
 
   // Fetch notes at page level so the Note tab button can be disabled when empty
   const { data: fetchedNotes } = useCachedFetch<NoteFile[]>(
@@ -98,7 +87,7 @@ export default function PaperPage({
   });
 
   // Mark tab as visited when switching
-  const switchView = useCallback((v: "summary" | "pdf" | "note" | "chat") => {
+  const switchView = useCallback((v: "summary" | "pdf" | "note") => {
     setVisitedTabs((prev) => {
       if (prev.has(v)) return prev;
       const next = new Set(prev);
@@ -110,10 +99,6 @@ export default function PaperPage({
 
   const refreshNotes = useCallback(() => {
     setNotesKey((k) => k + 1);
-  }, []);
-
-  const refreshThreads = useCallback(() => {
-    setThreadsKey((k) => k + 1);
   }, []);
 
   const job = useGenerateJob(id, refreshNotes);
@@ -136,38 +121,9 @@ export default function PaperPage({
     switchView("note");
   }
 
-  function handleSelectThread(threadId: string) {
-    setSelectedThread(threadId);
-    chat.loadThread(threadId);
-    switchView("chat");
+  function handleChatAboutPaper() {
+    router.push(`/chat/new?paperIds=${id}`);
   }
-
-  function handleNewThread() {
-    setSelectedThread(null);
-    chat.clearThread();
-    switchView("chat");
-    setMobileSidebar(false);
-  }
-
-  async function handleDeleteThread(threadId: string) {
-    await fetch(`/api/papers/${id}/threads/${threadId}`, {
-      method: "DELETE",
-    });
-    if (selectedThread === threadId) {
-      setSelectedThread(null);
-      chat.clearThread();
-      switchView("summary");
-    }
-    refreshThreads();
-  }
-
-  // Refresh threads list when streaming completes (new thread or new messages)
-  useEffect(() => {
-    if (!chat.isStreaming && chat.threadId) {
-      setSelectedThread(chat.threadId);
-      refreshThreads();
-    }
-  }, [chat.isStreaming, chat.threadId, refreshThreads]);
 
   if (loading) {
     return (
@@ -199,45 +155,46 @@ export default function PaperPage({
           {paper.title}
         </p>
         <div className="flex-1" />
-        <div className="flex shrink-0 items-center rounded-lg border border-border/40 p-0.5">
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="flex items-center rounded-lg border border-border/40 p-0.5">
+            <Button
+              variant={view === "summary" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => switchView("summary")}
+            >
+              <AlignLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Summary</span>
+            </Button>
+            <Button
+              variant={view === "pdf" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => switchView("pdf")}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">PDF</span>
+            </Button>
+            <Button
+              variant={view === "note" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 gap-1.5 text-xs"
+              onClick={() => {
+                if (!selectedNote && notes.length > 0) {
+                  setSelectedNote(notes[0]!.filename);
+                }
+                switchView("note");
+              }}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Note</span>
+            </Button>
+          </div>
           <Button
-            variant={view === "summary" ? "secondary" : "ghost"}
+            variant="ghost"
             size="sm"
             className="h-7 gap-1.5 text-xs"
-            onClick={() => switchView("summary")}
-          >
-            <AlignLeft className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Summary</span>
-          </Button>
-          <Button
-            variant={view === "pdf" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            onClick={() => switchView("pdf")}
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">PDF</span>
-          </Button>
-          <Button
-            variant={view === "note" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            disabled={notes.length === 0}
-            onClick={() => {
-              if (!selectedNote && notes.length > 0) {
-                setSelectedNote(notes[0]!.filename);
-              }
-              switchView("note");
-            }}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Note</span>
-          </Button>
-          <Button
-            variant={view === "chat" ? "secondary" : "ghost"}
-            size="sm"
-            className="h-7 gap-1.5 text-xs"
-            onClick={() => switchView("chat")}
+            onClick={handleChatAboutPaper}
           >
             <MessageCircle className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Chat</span>
@@ -256,31 +213,38 @@ export default function PaperPage({
               <LazyPdfViewer paperId={id} />
             </div>
           )}
-          {selectedNote && visitedTabs.has("note") && (
+          {visitedTabs.has("note") && (
             <div className={view === "note" ? "h-full" : "invisible absolute inset-0"}>
-              <LazyNoteViewer
-                paperId={id}
-                filename={selectedNote}
-              />
-            </div>
-          )}
-          {visitedTabs.has("chat") && (
-            <div className={view === "chat" ? "h-full" : "invisible absolute inset-0"}>
-              <LazyChatView
-                messages={chat.messages}
-                isStreaming={chat.isStreaming}
-                isThinking={chat.isThinking}
-                error={chat.error}
-                onSendMessage={chat.sendMessage}
-                onCancel={chat.cancelStream}
-                model={chat.model}
-                onModelChange={chat.setModel}
-              />
+              {selectedNote ? (
+                <LazyNoteViewer
+                  paperId={id}
+                  filename={selectedNote}
+                />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
+                  <FileText className="h-10 w-10 text-muted-foreground/30" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No notes yet for this paper
+                    </p>
+                    <p className="text-xs text-muted-foreground/60">
+                      Generate AI-powered notes to summarize, review, or analyze this paper
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => setGenerateOpen(true)}
+                  >
+                    <PenLine className="h-4 w-4" />
+                    Generate Note
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {(view === "note" || view === "chat") && (
+        {view === "note" && (
           <>
             {/* Mobile backdrop */}
             <div
@@ -294,17 +258,14 @@ export default function PaperPage({
               md:relative md:z-auto md:flex md:h-auto md:w-96 md:translate-y-0 md:rounded-none md:border-l md:border-t-0 md:transition-none
               ${mobileSidebar ? "translate-y-0" : "translate-y-full md:translate-y-0"}
             `}>
-              <button onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
+              <Button variant="ghost" onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
                 <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
-              </button>
-              <PaperSidebar
+              </Button>
+              <NotesSidebar
+                key={notesKey}
                 paperId={id}
-                mode={view === "note" ? "notes" : "threads"}
-                notesKey={notesKey}
                 generating={job.generating}
                 selectedNote={selectedNote}
-                selectedThread={selectedThread}
-                threadsKey={threadsKey}
                 onGenerate={() => {
                   setMobileSidebar(false);
                   setGenerateOpen(true);
@@ -324,33 +285,28 @@ export default function PaperPage({
                   }
                   refreshNotes();
                 }}
-                onSelectThread={(threadId) => {
-                  handleSelectThread(threadId);
-                  setMobileSidebar(false);
-                }}
-                onNewThread={handleNewThread}
-                onDeleteThread={handleDeleteThread}
-                onThreadsLoaded={setThreads}
               />
             </div>
           </>
         )}
       </div>
 
-      {/* Mobile FAB to access sidebar (only for note/chat tabs) */}
-      {(view === "note" || view === "chat") && (
-        <button
-          className={`fixed bottom-6 right-6 z-30 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-background shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      {/* Mobile FAB to access sidebar (only for note tab) */}
+      {view === "note" && (
+        <Button
+          variant="outline"
+          size="icon-lg"
+          className={`fixed bottom-6 right-6 z-30 rounded-full shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
           onClick={() => setMobileSidebar(true)}
           aria-label="Open sidebar"
         >
           <FileText className="h-4.5 w-4.5 text-foreground" />
-          {(notes.length + threads.length) > 0 && (
+          {notes.length > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
-              {notes.length + threads.length}
+              {notes.length}
             </span>
           )}
-        </button>
+        </Button>
       )}
 
       <GenerateNoteDialog

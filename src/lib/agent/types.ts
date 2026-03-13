@@ -25,6 +25,8 @@ export interface AgentOptions {
 /** Context passed to task config's buildPrompt function */
 export interface PromptContext {
   paper: PaperMetadata;
+  /** Multiple papers for cross-paper chat */
+  papers?: PaperMetadata[];
   promptInput: string;
   /** Resolved from PROMPT_TEMPLATES if promptInput is a key, otherwise equals promptInput */
   taskInstruction: string;

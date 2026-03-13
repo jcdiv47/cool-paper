@@ -17,6 +17,7 @@
     "cal-heatmap": "^4.2.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "dayjs": "^1.11.19",
     "fast-xml-parser": "^5.4.2",
     "highlight.js": "^11.11.1",

@@ -37,6 +37,7 @@ export interface ThreadMessage {
 export interface Thread {
   id: string;
   title: string;
+  paperIds: string[];
   createdAt: string;
   updatedAt: string;
   sessionId?: string;
@@ -50,6 +51,20 @@ export interface ThreadListItem {
   updatedAt: string;
   messageCount: number;
   preview?: string;
+}
+
+export interface ChatThreadListItem extends ThreadListItem {
+  paperIds: string[];
+  paperTitles: string[];
+}
+
+export interface RecentNote {
+  paperId: string;
+  paperTitle: string;
+  filename: string;
+  title: string;
+  modifiedAt: string;
+  model?: string;
 }
 
 export interface ChatRequest {

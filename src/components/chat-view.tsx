@@ -22,7 +22,8 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { MODEL_OPTIONS } from "@/lib/models";
-import type { ThreadMessage } from "@/types";
+import { PaperCardRow } from "@/components/paper-card-row";
+import type { ThreadMessage, PaperMetadata } from "@/types";
 
 interface ChatViewProps {
   messages: ThreadMessage[];
@@ -33,13 +34,23 @@ interface ChatViewProps {
   onCancel: () => void;
   model: string;
   onModelChange: (model: string) => void;
+  papers?: PaperMetadata[];
+  onRemovePaper?: (paperId: string) => void;
+  onAddPaperClick?: () => void;
 }
 
-const SUGGESTIONS = [
+const SINGLE_SUGGESTIONS = [
   "Explain the main contribution",
   "What are the key assumptions?",
   "Summarize the methodology",
   "What are the limitations?",
+];
+
+const MULTI_SUGGESTIONS = [
+  "Compare the methodologies",
+  "What are the key differences?",
+  "How do the results relate?",
+  "Summarize common themes",
 ];
 
 function ThinkingCard({
@@ -113,6 +124,9 @@ export function ChatView({
   onCancel,
   model,
   onModelChange,
+  papers,
+  onRemovePaper,
+  onAddPaperClick,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -175,8 +189,30 @@ export function ChatView({
     }
   }
 
+  const isMultiPaper = papers && papers.length > 1;
+  const suggestions = isMultiPaper ? MULTI_SUGGESTIONS : SINGLE_SUGGESTIONS;
+  const placeholderText = isMultiPaper
+    ? "Ask about these papers…"
+    : "Ask about this paper…";
+  const emptyHeading = isMultiPaper
+    ? "Ask about these papers"
+    : "Ask anything about this paper";
+
   return (
     <div className="flex h-full flex-col">
+      {/* Paper cards row */}
+      {papers && papers.length > 0 && onRemovePaper && onAddPaperClick && (
+        <div className="border-b border-border/40">
+          <div className="mx-auto max-w-3xl">
+            <PaperCardRow
+              papers={papers}
+              onRemove={onRemovePaper}
+              onAddClick={onAddPaperClick}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Messages area */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8">
@@ -185,21 +221,23 @@ export function ChatView({
               <MessageCircle className="h-10 w-10 text-muted-foreground/30" />
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
-                  Ask anything about this paper
+                  {emptyHeading}
                 </p>
                 <p className="text-xs text-muted-foreground/60">
-                  The AI can read the paper source files to answer your questions
+                  The AI can read paper source files to answer your questions
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((s) => (
-                  <button
+                {suggestions.map((s) => (
+                  <Button
                     key={s}
+                    variant="outline"
+                    size="sm"
                     onClick={() => onSendMessage(s)}
-                    className="rounded-full border border-border/60 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                    className="rounded-full font-normal text-muted-foreground"
                   >
                     {s}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -294,7 +332,7 @@ export function ChatView({
               resizeTextarea();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about this paper…"
+            placeholder={placeholderText}
             rows={1}
             className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border border-border/60 bg-muted/20 px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-border focus:bg-background"
             disabled={isStreaming}

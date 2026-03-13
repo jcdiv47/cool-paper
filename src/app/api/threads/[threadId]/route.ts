@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getThread, deleteThread } from "@/lib/threads";
+import { getChatThread, deleteChatThread } from "@/lib/chat-threads";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string; threadId: string }> }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
-  const { id, threadId } = await params;
-  const thread = await getThread(id, threadId);
+  const { threadId } = await params;
+  const thread = await getChatThread(threadId);
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
@@ -15,11 +15,11 @@ export async function GET(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: Promise<{ id: string; threadId: string }> }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
-  const { id, threadId } = await params;
+  const { threadId } = await params;
   try {
-    await deleteThread(id, threadId);
+    await deleteChatThread(threadId);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });

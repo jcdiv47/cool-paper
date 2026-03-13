@@ -108,8 +108,10 @@ export function PaperCard({
                 </span>
               ))}
               {noteCount > 0 && (
-                <button
-                  className="flex items-center gap-1 text-[11px] text-muted-foreground/80 transition-colors hover:text-foreground"
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-[11px] text-muted-foreground/80 hover:text-foreground"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -118,7 +120,7 @@ export function PaperCard({
                 >
                   <FileText className="h-3 w-3" />
                   {noteCount}
-                </button>
+                </Button>
               )}
             </div>
           </div>

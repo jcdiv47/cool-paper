@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileText, NotebookPen, Tag } from "lucide-react";
+import { FileText, NotebookPen, Tag, MessageCircle } from "lucide-react";
 import type { PaperMetadata } from "@/types";
 
 interface StatsBlockProps {
@@ -10,6 +10,7 @@ interface StatsBlockProps {
 
 export function StatsBlock({ papers }: StatsBlockProps) {
   const [noteCount, setNoteCount] = useState<number | null>(null);
+  const [chatCount, setChatCount] = useState<number | null>(null);
 
   const paperCount = papers.length;
   const categoryCount = new Set(papers.flatMap((p) => p.categories)).size;
@@ -32,7 +33,18 @@ export function StatsBlock({ papers }: StatsBlockProps) {
       if (!cancelled) setNoteCount(total);
     }
 
+    async function fetchChats() {
+      try {
+        const res = await fetch("/api/threads");
+        const threads: unknown[] = await res.json();
+        if (!cancelled) setChatCount(threads.length);
+      } catch {
+        if (!cancelled) setChatCount(0);
+      }
+    }
+
     fetchNotes();
+    fetchChats();
     return () => {
       cancelled = true;
     };
@@ -42,10 +54,11 @@ export function StatsBlock({ papers }: StatsBlockProps) {
     { value: paperCount, label: "Papers", icon: FileText },
     { value: noteCount, label: "Notes", icon: NotebookPen },
     { value: categoryCount, label: "Topics", icon: Tag },
+    { value: chatCount, label: "Chats", icon: MessageCircle },
   ];
 
   return (
-    <div className="flex shrink-0 items-center justify-around gap-4 py-2 sm:w-64 sm:flex-col sm:items-start sm:justify-center sm:px-6">
+    <div className="grid shrink-0 grid-cols-2 gap-x-12 gap-y-4 py-2 sm:w-64 sm:px-6">
       {stats.map((s, i) => (
         <div
           key={s.label}

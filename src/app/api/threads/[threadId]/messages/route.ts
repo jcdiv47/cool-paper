@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPaper } from "@/lib/papers";
-import { getThread, saveThread, generateThreadTitle } from "@/lib/threads";
+import { getChatThread, saveChatThread, generateThreadTitle } from "@/lib/chat-threads";
 import {
   resolveAgentQuery,
   executeAgentQuery,
@@ -9,32 +9,32 @@ import {
 } from "@/lib/agent";
 import type { ResolvedAgentQuery } from "@/lib/agent";
 import type { ThreadMessage } from "@/types";
+import type { PaperMetadata } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string; threadId: string }> }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
-  const { id, threadId } = await params;
+  const { threadId } = await params;
   const { message, model } = await request.json();
 
-  const paper = await getPaper(id);
-  if (!paper) {
-    return NextResponse.json({ error: "Paper not found" }, { status: 404 });
+  // Load thread
+  let thread = await getChatThread(threadId);
+  if (!thread) {
+    return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
 
-  // Load or create thread
-  let thread = await getThread(id, threadId);
+  // Load all papers for this thread
+  const papers: PaperMetadata[] = [];
+  for (const pid of thread.paperIds) {
+    const paper = await getPaper(pid);
+    if (paper) papers.push(paper);
+  }
 
-  if (!thread) {
-    thread = {
-      id: threadId,
-      title: generateThreadTitle(message),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      messages: [],
-    };
+  if (papers.length === 0) {
+    return NextResponse.json({ error: "No valid papers found" }, { status: 404 });
   }
 
   // Append user message
@@ -46,16 +46,22 @@ export async function POST(
   thread.messages.push(userMessage);
   thread.updatedAt = userMessage.timestamp;
 
-  // Save immediately so user message is persisted even if streaming fails
-  await saveThread(id, thread);
+  // Update title on first message
+  if (thread.messages.length === 1) {
+    thread.title = generateThreadTitle(message);
+  }
 
-  // Build conversation history (all messages except the latest user one — that goes in the prompt)
+  // Save immediately so user message is persisted even if streaming fails
+  await saveChatThread(thread);
+
+  // Build conversation history (all messages except the latest user one)
   const history = thread.messages.slice(0, -1);
 
   // If model changed from the thread's stored model, don't resume the old session
   const modelChanged = model && model !== thread.model;
   const resolved = resolveAgentQuery({
-    paper,
+    paper: papers[0]!,
+    papers: papers.length > 1 ? papers : undefined,
     promptInput: message,
     noteFilename: "",
     taskType: "conversation",
@@ -98,7 +104,6 @@ export async function POST(
             continue;
           }
 
-          // Thinking deltas (extended thinking)
           const thinkingDelta = extractThinkingDelta(msg);
           if (thinkingDelta) {
             thinkingText += thinkingDelta;
@@ -106,10 +111,8 @@ export async function POST(
             continue;
           }
 
-          // Token-level streaming from stream_event messages
           const delta = extractTextDelta(msg);
           if (delta) {
-            // Signal transition from thinking to text on first text delta
             if (!thinkingDone) {
               thinkingDone = true;
               send({ type: "thinking_done" });
@@ -134,7 +137,6 @@ export async function POST(
         try {
           result = await runQuery(resolved);
         } catch (err) {
-          // If resume failed (stale session), retry without resume
           if (resolved.options.resume) {
             const freshQuery: ResolvedAgentQuery = {
               ...resolved,
@@ -144,7 +146,6 @@ export async function POST(
                 sessionId: undefined,
               },
             };
-            // Clear stale sessionId from thread
             thread!.sessionId = undefined;
             result = await runQuery(freshQuery);
           } else {
@@ -152,10 +153,8 @@ export async function POST(
           }
         }
 
-        // Persist model on the thread
         if (model) thread!.model = model;
 
-        // Append assistant message and save
         if (result.assistantText) {
           const assistantMessage: ThreadMessage = {
             role: "assistant",
@@ -170,7 +169,7 @@ export async function POST(
         if (result.sessionId) {
           thread!.sessionId = result.sessionId;
         }
-        await saveThread(id, thread!);
+        await saveChatThread(thread!);
 
         send({ type: "message_done", sessionId: result.sessionId || null });
       } catch (err) {
@@ -179,8 +178,7 @@ export async function POST(
         if (errorMessage !== "Aborted") {
           send({ type: "error", message: errorMessage });
         }
-        // Save thread state (user message already saved)
-        await saveThread(id, thread!);
+        await saveChatThread(thread!);
       } finally {
         controller.close();
       }

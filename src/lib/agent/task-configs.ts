@@ -41,6 +41,28 @@ export const CONVERSATION_CONFIG: TaskConfig = {
       historyBlock = `\nPrevious conversation:\n${formatted}\n\nNow respond to the user's latest message.\n`;
     }
 
+    // Multi-paper context
+    if (ctx.papers && ctx.papers.length > 0) {
+      const papersBlock = ctx.papers
+        .map((p, i) => {
+          const sanitizedId = p.arxivId.replace(/\//g, "_");
+          return `[${i + 1}] "${p.title}" — ${p.authors.slice(0, 3).join(", ")}${p.authors.length > 3 ? " et al." : ""}
+    Abstract: ${p.abstract.slice(0, 300)}${p.abstract.length > 300 ? "…" : ""}
+    Source files: papers/${sanitizedId}/`;
+        })
+        .join("\n\n");
+
+      return `You are discussing academic papers with the user.
+
+Papers in this conversation:
+${papersBlock}
+
+The paper source files are available in the current working directory under papers/.
+When referencing papers, use their number [1], [2], etc. or title.
+${historyBlock}
+${ctx.taskInstruction}`;
+    }
+
     return `You are discussing an academic paper with the user.
 
 Title: ${ctx.paper.title}

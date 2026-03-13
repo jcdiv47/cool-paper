@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -47,8 +46,8 @@ export function GenerateNoteDialog({
   onStartJob,
   onCancelJob,
 }: GenerateNoteDialogProps) {
-  const [prompt, setPrompt] = useState("");
-  const [noteFilename, setNoteFilename] = useState("summary.md");
+  const [prompt, setPrompt] = useState(PROMPT_TEMPLATES["summary"] || "");
+  const [activeQuickPrompt, setActiveQuickPrompt] = useState<string>("summary");
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [copied, setCopied] = useState(false);
   const outputRef = useRef<HTMLPreElement>(null);
@@ -60,12 +59,21 @@ export function GenerateNoteDialog({
   }, [output]);
 
   function handleQuickPrompt(value: string) {
-    setPrompt(PROMPT_TEMPLATES[value] || value);
-    setNoteFilename(`${value}.md`);
+    if (value === "custom") {
+      setActiveQuickPrompt("custom");
+      setPrompt("");
+    } else {
+      setActiveQuickPrompt(value);
+      setPrompt(PROMPT_TEMPLATES[value] || value);
+    }
   }
 
   function handleGenerate() {
     if (!prompt.trim()) return;
+    const noteFilename =
+      activeQuickPrompt && activeQuickPrompt !== "custom"
+        ? `${activeQuickPrompt}.md`
+        : `note-${Math.random().toString(36).slice(2, 5)}.md`;
     onStartJob(prompt.trim(), noteFilename, undefined, model);
   }
 
@@ -94,13 +102,20 @@ export function GenerateNoteDialog({
               {QUICK_PROMPTS.map((qp) => (
                 <Badge
                   key={qp.value}
-                  variant={prompt === (PROMPT_TEMPLATES[qp.value] || qp.value) ? "default" : "outline"}
+                  variant={activeQuickPrompt === qp.value ? "default" : "outline"}
                   className="cursor-pointer transition-colors"
                   onClick={() => handleQuickPrompt(qp.value)}
                 >
                   {qp.label}
                 </Badge>
               ))}
+              <Badge
+                variant={activeQuickPrompt === "custom" ? "default" : "outline"}
+                className={`cursor-pointer transition-colors ${activeQuickPrompt !== "custom" ? "border-dashed" : ""}`}
+                onClick={() => handleQuickPrompt("custom")}
+              >
+                Custom
+              </Badge>
             </div>
           </div>
 
@@ -113,17 +128,6 @@ export function GenerateNoteDialog({
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe what you want the AI to analyze..."
               rows={3}
-              disabled={generating}
-            />
-          </div>
-
-          {/* Filename */}
-          <div className="space-y-2">
-            <Label htmlFor="filename">Filename</Label>
-            <Input
-              id="filename"
-              value={noteFilename}
-              onChange={(e) => setNoteFilename(e.target.value)}
               disabled={generating}
             />
           </div>

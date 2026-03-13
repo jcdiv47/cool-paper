@@ -6,6 +6,8 @@ import type { TaskType, AgentOptions, PromptContext, ResolvedAgentQuery } from "
 
 export interface ResolveAgentQueryParams {
   paper: PaperMetadata;
+  /** Multiple papers for cross-paper chat */
+  papers?: PaperMetadata[];
   promptInput: string;
   noteFilename: string;
   taskType?: TaskType;
@@ -16,6 +18,7 @@ export interface ResolveAgentQueryParams {
 export function resolveAgentQuery(params: ResolveAgentQueryParams): ResolvedAgentQuery {
   const {
     paper,
+    papers,
     promptInput,
     noteFilename,
     taskType = "note-generation",
@@ -30,7 +33,7 @@ export function resolveAgentQuery(params: ResolveAgentQueryParams): ResolvedAgen
   const taskInstruction = PROMPT_TEMPLATES[promptInput] || promptInput;
 
   const context: PromptContext = {
-    paper, promptInput, taskInstruction, notesDir, noteFilename,
+    paper, papers, promptInput, taskInstruction, notesDir, noteFilename,
     conversationHistory,
   };
 
