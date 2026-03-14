@@ -9,11 +9,13 @@ export function Header({
   fullWidth,
   search,
   onSearchChange,
+  searchPlaceholder = "Search papers...",
 }: {
   children?: React.ReactNode;
   fullWidth?: boolean;
   search?: string;
   onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
 }) {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-xl">
@@ -37,7 +39,7 @@ export function Header({
             <Input
               value={search ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search papers..."
+              placeholder={searchPlaceholder}
               className="h-8 pl-9 text-sm"
             />
           </div>

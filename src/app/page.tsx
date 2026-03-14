@@ -228,16 +228,27 @@ export default function Home() {
                 <h2 className="text-base font-medium text-foreground">
                   Recent Notes
                 </h2>
-                {papers.length > 0 && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setNotePickerOpen(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add Note
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {recentNotes.length > 0 && (
+                    <Link
+                      href="/notes"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+                    >
+                      View all
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )}
+                  {papers.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setNotePickerOpen(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Note
+                    </Button>
+                  )}
+                </div>
               </div>
               {recentNotes.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/40 py-16 text-center">
