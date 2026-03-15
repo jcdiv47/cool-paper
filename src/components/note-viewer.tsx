@@ -6,22 +6,21 @@ import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { useCachedFetch } from "@/hooks/use-cached-fetch";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 interface NoteViewerProps {
   paperId: string;
   filename: string;
 }
 
-interface NoteData {
-  content: string;
-}
-
 export function NoteViewer({ paperId, filename }: NoteViewerProps) {
-  const { data, loading } = useCachedFetch<NoteData>(
-    `/api/papers/${paperId}/notes/${encodeURIComponent(filename)}`,
-    { cacheKey: `paper:note:${paperId}:${filename}` }
-  );
+  const note = useQuery(api.notes.get, {
+    sanitizedPaperId: paperId,
+    filename,
+  });
+
+  const loading = note === undefined;
 
   return (
     <div className="flex h-full flex-col">
@@ -39,7 +38,7 @@ export function NoteViewer({ paperId, filename }: NoteViewerProps) {
               remarkPlugins={[remarkGfm, remarkMath]}
               rehypePlugins={[rehypeHighlight, rehypeKatex]}
             >
-              {data?.content || ""}
+              {note?.content || ""}
             </ReactMarkdown>
           </article>
         )}

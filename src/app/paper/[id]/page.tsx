@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { NotesSidebar } from "@/components/notes-sidebar";
 import { SummaryView } from "@/components/summary-view";
 import { GenerateNoteDialog } from "@/components/generate-note-dialog";
-import { useGenerateJob } from "@/hooks/use-generate-job";
-import { useCachedFetch } from "@/hooks/use-cached-fetch";
+import { useConvexGenerateJob } from "@/hooks/use-convex-generate-job";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, BookOpen, AlignLeft, MessageCircle, PenLine } from "lucide-react";
@@ -59,12 +60,14 @@ export default function PaperPage({
   );
   const [mobileSidebar, setMobileSidebar] = useState(false);
 
-  // Fetch notes at page level so the Note tab button can be disabled when empty
-  const { data: fetchedNotes } = useCachedFetch<NoteFile[]>(
-    `/api/papers/${id}/notes`,
-    { cacheKey: `paper:notes:${id}`, invalidateKey: notesKey }
-  );
-  const notes = fetchedNotes ?? [];
+  // Notes from Convex (realtime)
+  const convexNotes = useQuery(api.notes.listByPaper, { sanitizedPaperId: id });
+  const notes: NoteFile[] = (convexNotes ?? []).map((n) => ({
+    filename: n.filename,
+    title: n.title,
+    modifiedAt: n.modifiedAt,
+    model: n.model,
+  }));
 
   // Auto-select first note when arriving via ?tab=notes
   useEffect(() => {
@@ -101,13 +104,22 @@ export default function PaperPage({
     setNotesKey((k) => k + 1);
   }, []);
 
-  const job = useGenerateJob(id, refreshNotes);
+  const job = useConvexGenerateJob(id, refreshNotes);
 
-  // Cached paper metadata fetch
-  const { data: paper, loading } = useCachedFetch<PaperMetadata>(
-    `/api/papers/${id}`,
-    { cacheKey: `paper:meta:${id}`, cacheOnly: true }
-  );
+  // Paper metadata from Convex (realtime)
+  const convexPaper = useQuery(api.papers.get, { sanitizedId: id });
+  const loading = convexPaper === undefined;
+  const paper: PaperMetadata | null = convexPaper
+    ? {
+        arxivId: convexPaper.arxivId,
+        title: convexPaper.title,
+        authors: convexPaper.authors,
+        abstract: convexPaper.abstract,
+        published: convexPaper.published,
+        categories: convexPaper.categories,
+        addedAt: convexPaper.addedAt,
+      }
+    : null;
 
   // Redirect home if paper not found after loading
   useEffect(() => {

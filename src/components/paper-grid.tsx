@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { PaperCard } from "./paper-card";
 import { Search, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { PaperMetadata, NoteFile } from "@/types";
+import type { PaperMetadata } from "@/types";
 
 interface PaperGridProps {
   papers: PaperMetadata[];
@@ -14,25 +16,7 @@ interface PaperGridProps {
 }
 
 export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
-  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    async function fetchNoteCounts() {
-      const counts: Record<string, number> = {};
-      for (const paper of papers) {
-        const sanitizedId = paper.arxivId.replace(/\//g, "_");
-        try {
-          const res = await fetch(`/api/papers/${sanitizedId}/notes`);
-          const notes: NoteFile[] = await res.json();
-          counts[paper.arxivId] = notes.length;
-        } catch {
-          counts[paper.arxivId] = 0;
-        }
-      }
-      setNoteCounts(counts);
-    }
-    fetchNoteCounts();
-  }, [papers]);
+  const noteCounts = useQuery(api.notes.countByPapers) ?? {};
 
   const filtered = useMemo(() => {
     if (!search.trim()) return papers;

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import {
   CommandDialog,
   CommandInput,
@@ -29,19 +31,23 @@ export function PaperPickerDialog({
   multi = false,
   onSelect,
 }: PaperPickerDialogProps) {
-  const [papers, setPapers] = useState<PaperMetadata[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+
+  const convexPapers = useQuery(api.papers.list);
+  const loading = convexPapers === undefined;
+  const papers: PaperMetadata[] = (convexPapers ?? []).map((p) => ({
+    arxivId: p.arxivId,
+    title: p.title,
+    authors: p.authors,
+    abstract: p.abstract,
+    published: p.published,
+    categories: p.categories,
+    addedAt: p.addedAt,
+  }));
 
   useEffect(() => {
     if (!open) return;
     setSelected(new Set());
-    setLoading(true);
-    fetch("/api/papers")
-      .then((r) => r.json())
-      .then((data) => setPapers(data))
-      .catch(() => setPapers([]))
-      .finally(() => setLoading(false));
   }, [open]);
 
   const excludeSet = useMemo(() => new Set(excludeIds), [excludeIds]);

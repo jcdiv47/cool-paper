@@ -1,54 +1,74 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { FileText, NotebookPen, Tag, MessageCircle } from "lucide-react";
 import type { PaperMetadata } from "@/types";
+
+const CACHE_KEY = "stats-block-cache";
+
+interface CachedStats {
+  noteCount: number;
+  chatCount: number;
+  timestamp: number;
+}
+
+function readCache(): CachedStats | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(stats: CachedStats) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(stats));
+  } catch {
+    // localStorage unavailable
+  }
+}
 
 interface StatsBlockProps {
   papers: PaperMetadata[];
 }
 
 export function StatsBlock({ papers }: StatsBlockProps) {
-  const [noteCount, setNoteCount] = useState<number | null>(null);
-  const [chatCount, setChatCount] = useState<number | null>(null);
+  const cached = readCache();
+
+  // Use Convex queries instead of API fetches
+  const noteCounts = useQuery(api.notes.countByPapers);
+  const threads = useQuery(api.threads.list);
+
+  const [noteCount, setNoteCount] = useState<number | null>(cached?.noteCount ?? null);
+  const [chatCount, setChatCount] = useState<number | null>(cached?.chatCount ?? null);
 
   const paperCount = papers.length;
   const categoryCount = new Set(papers.flatMap((p) => p.categories)).size;
 
+  // Update from Convex data
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchNotes() {
-      let total = 0;
-      await Promise.all(
-        papers.map(async (p) => {
-          const sanitizedId = p.arxivId.replace(/\//g, "_");
-          try {
-            const res = await fetch(`/api/papers/${sanitizedId}/notes`);
-            const notes: { filename: string }[] = await res.json();
-            total += notes.length;
-          } catch {}
-        })
-      );
-      if (!cancelled) setNoteCount(total);
+    if (noteCounts !== undefined) {
+      const total = Object.values(noteCounts).reduce((sum, n) => sum + n, 0);
+      setNoteCount(total);
     }
+  }, [noteCounts]);
 
-    async function fetchChats() {
-      try {
-        const res = await fetch("/api/threads");
-        const threads: unknown[] = await res.json();
-        if (!cancelled) setChatCount(threads.length);
-      } catch {
-        if (!cancelled) setChatCount(0);
-      }
+  useEffect(() => {
+    if (threads !== undefined) {
+      setChatCount(threads.length);
     }
+  }, [threads]);
 
-    fetchNotes();
-    fetchChats();
-    return () => {
-      cancelled = true;
-    };
-  }, [papers]);
+  // Persist to localStorage when both are loaded
+  useEffect(() => {
+    if (noteCount !== null && chatCount !== null) {
+      writeCache({ noteCount, chatCount, timestamp: Date.now() });
+    }
+  }, [noteCount, chatCount]);
 
   const stats = [
     { value: paperCount, label: "Papers", icon: FileText },

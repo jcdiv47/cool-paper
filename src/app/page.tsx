@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { PaperCard } from "@/components/paper-card";
 import { ActivityHeatmap } from "@/components/activity-heatmap";
@@ -12,67 +14,45 @@ import { PaperPickerDialog } from "@/components/paper-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus, FileText, NotebookPen, ArrowRight } from "lucide-react";
 import { Toaster, toast } from "sonner";
-import { removeByPrefix } from "@/lib/cache";
 import { MODEL_OPTIONS } from "@/lib/models";
-import type { PaperMetadata, NoteFile, RecentNote } from "@/types";
+import type { PaperMetadata, RecentNote } from "@/types";
 
 export default function Home() {
   const router = useRouter();
-  const [papers, setPapers] = useState<PaperMetadata[]>([]);
-  const [recentNotes, setRecentNotes] = useState<RecentNote[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [noteCounts, setNoteCounts] = useState<Record<string, number>>({});
 
-  const fetchPapers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/papers");
-      const data = await res.json();
-      setPapers(data);
-    } catch {
-      toast.error("Failed to load papers");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Papers from Convex (realtime)
+  const convexPapers = useQuery(api.papers.list);
+  const loading = convexPapers === undefined;
 
-  const fetchRecentNotes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notes?limit=6");
-      const data = await res.json();
-      setRecentNotes(data);
-    } catch {
-      // silent
-    }
-  }, []);
+  // Map Convex papers to PaperMetadata shape for components
+  const papers: PaperMetadata[] = (convexPapers ?? []).map((p) => ({
+    arxivId: p.arxivId,
+    title: p.title,
+    authors: p.authors,
+    abstract: p.abstract,
+    published: p.published,
+    categories: p.categories,
+    addedAt: p.addedAt,
+  }));
 
-  useEffect(() => {
-    fetchPapers();
-    fetchRecentNotes();
-  }, [fetchPapers, fetchRecentNotes]);
+  // Recent notes from Convex
+  const convexRecentNotes = useQuery(api.notes.recentNotes, { limit: 6 });
+  const recentNotes: RecentNote[] = (convexRecentNotes ?? []).map((n) => ({
+    paperId: n.sanitizedPaperId,
+    paperTitle: n.paperTitle,
+    filename: n.filename,
+    title: n.title,
+    modifiedAt: n.modifiedAt,
+    model: n.model,
+  }));
 
-  // Fetch note counts for the displayed papers
-  useEffect(() => {
-    if (papers.length === 0) return;
-    const displayed = papers.slice(0, 6);
-    async function fetchCounts() {
-      const counts: Record<string, number> = {};
-      for (const paper of displayed) {
-        const sanitizedId = paper.arxivId.replace(/\//g, "_");
-        try {
-          const res = await fetch(`/api/papers/${sanitizedId}/notes`);
-          const notes: NoteFile[] = await res.json();
-          counts[paper.arxivId] = notes.length;
-        } catch {
-          counts[paper.arxivId] = 0;
-        }
-      }
-      setNoteCounts(counts);
-    }
-    fetchCounts();
-  }, [papers]);
+  // Note counts from Convex
+  const convexAllNotes = useQuery(api.notes.countByPapers);
+  const noteCounts: Record<string, number> = convexAllNotes ?? {};
 
+  // Keyboard shortcut
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -88,11 +68,6 @@ export default function Home() {
     const sanitized = arxivId.replace(/\//g, "_");
     try {
       await fetch(`/api/papers/${sanitized}`, { method: "DELETE" });
-      removeByPrefix(`paper:meta:${sanitized}`);
-      removeByPrefix(`paper:notes:${sanitized}`);
-      removeByPrefix(`paper:note:${sanitized}`);
-      removeByPrefix(`paper:threads:${sanitized}`);
-      setPapers((prev) => prev.filter((p) => p.arxivId !== arxivId));
       toast.success("Paper removed");
     } catch {
       toast.error("Failed to delete paper");
@@ -113,6 +88,11 @@ export default function Home() {
     if (days < 30) return `${days}d ago`;
     return new Date(dateStr).toLocaleDateString();
   }
+
+  // Callback to trigger after adding paper - no longer need manual fetch
+  const handlePaperAdded = useCallback(() => {
+    toast.success("Paper added successfully");
+  }, []);
 
   const recentPapers = papers.slice(0, 6);
 
@@ -302,11 +282,7 @@ export default function Home() {
       <AddPaperDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        onAdded={() => {
-          fetchPapers();
-          fetchRecentNotes();
-          toast.success("Paper added successfully");
-        }}
+        onAdded={handlePaperAdded}
       />
       <PaperPickerDialog
         open={notePickerOpen}

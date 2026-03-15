@@ -1,8 +1,59 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import "cal-heatmap/cal-heatmap.css";
 import type { PaperMetadata } from "@/types";
+
+const CACHE_KEY = "activity-heatmap-cache";
+
+interface CachedHeatmap {
+  data: { date: number; value: number }[];
+  timestamp: number;
+}
+
+function readCache(): CachedHeatmap | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: { date: number; value: number }[]) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+function buildHeatmapData(
+  papers: PaperMetadata[],
+  noteDates: string[]
+): { date: number; value: number }[] {
+  const counts: Record<string, number> = {};
+
+  function addDate(isoString: string) {
+    const d = new Date(isoString);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  papers.forEach((p) => {
+    if (p.addedAt) addDate(p.addedAt);
+  });
+
+  noteDates.forEach((d) => addDate(d));
+
+  return Object.entries(counts).map(([dateStr, value]) => ({
+    date: Math.floor(new Date(dateStr).getTime() / 1000),
+    value,
+  }));
+}
 
 interface ActivityHeatmapProps {
   papers: PaperMetadata[];
@@ -14,8 +65,25 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const calRef = useRef<any>(null);
 
+  // Note dates from Convex (realtime)
+  const noteDates = useQuery(api.notes.allDates);
+
   useEffect(() => {
     let destroyed = false;
+
+    // Use cached data for instant render, or wait for Convex
+    const cached = readCache();
+    const heatmapData =
+      noteDates !== undefined
+        ? buildHeatmapData(papers, noteDates)
+        : cached?.data ?? null;
+
+    if (!heatmapData) return;
+
+    // Persist when we have fresh Convex data
+    if (noteDates !== undefined) {
+      writeCache(heatmapData);
+    }
 
     async function init() {
       const [
@@ -32,41 +100,8 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
 
       if (destroyed || !containerRef.current || !legendRef.current) return;
 
-      // Aggregate papers + notes by day (using unix timestamps in ms)
-      const counts: Record<string, number> = {};
-
-      function addDate(isoString: string) {
-        // Normalize to midnight UTC for consistent day grouping
-        const d = new Date(isoString);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        counts[key] = (counts[key] || 0) + 1;
-      }
-
-      papers.forEach((p) => {
-        if (p.addedAt) addDate(p.addedAt);
-      });
-
-      // Fetch notes for each paper and count by date
-      await Promise.all(
-        papers.map(async (p) => {
-          const sanitizedId = p.arxivId.replace(/\//g, "_");
-          try {
-            const res = await fetch(`/api/papers/${sanitizedId}/notes`);
-            const notes: { modifiedAt: string }[] = await res.json();
-            notes.forEach((n) => {
-              if (n.modifiedAt) addDate(n.modifiedAt);
-            });
-          } catch {}
-        })
-      );
-
-      if (destroyed) return;
-
-      // Convert to array with unix timestamps (seconds) as cal-heatmap expects
-      const data = Object.entries(counts).map(([dateStr, value]) => ({
-        date: Math.floor(new Date(dateStr).getTime() / 1000),
-        value,
-      }));
+      // Destroy previous instance if re-rendering
+      calRef.current?.destroy();
 
       const cal = new CalHeatmap();
       calRef.current = cal;
@@ -78,7 +113,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       cal.paint(
         {
           data: {
-            source: data,
+            source: heatmapData,
             x: (d: { date: number }) => d.date * 1000,
             y: (d: { value: number }) => d.value,
             groupY: "sum",
@@ -157,7 +192,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       destroyed = true;
       calRef.current?.destroy();
     };
-  }, [papers]);
+  }, [papers, noteDates]);
 
   return (
     <div

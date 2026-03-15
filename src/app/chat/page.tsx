@@ -1,36 +1,34 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { ThreadList } from "@/components/thread-list";
 import { PaperPickerDialog } from "@/components/paper-picker-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Toaster, toast } from "sonner";
+import { useState } from "react";
 import type { ChatThreadListItem } from "@/types";
 
 export default function ChatInboxPage() {
   const router = useRouter();
-  const [threads, setThreads] = useState<ChatThreadListItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const fetchThreads = useCallback(async () => {
-    try {
-      const res = await fetch("/api/threads");
-      const data = await res.json();
-      setThreads(data);
-    } catch {
-      toast.error("Failed to load chats");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const convexThreads = useQuery(api.threads.list);
+  const removeThread = useMutation(api.threads.remove);
+  const loading = convexThreads === undefined;
 
-  useEffect(() => {
-    fetchThreads();
-  }, [fetchThreads]);
+  const threads: ChatThreadListItem[] = (convexThreads ?? []).map((t) => ({
+    id: t._id,
+    title: t.title,
+    updatedAt: t.updatedAt,
+    messageCount: t.messageCount,
+    preview: t.preview,
+    paperIds: t.paperIds,
+    paperTitles: t.paperTitles,
+  }));
 
   function handleNewChat(paperIds: string[]) {
     router.push(`/chat/new?paperIds=${paperIds.join(",")}`);
@@ -38,8 +36,7 @@ export default function ChatInboxPage() {
 
   async function handleDelete(threadId: string) {
     try {
-      await fetch(`/api/threads/${threadId}`, { method: "DELETE" });
-      setThreads((prev) => prev.filter((t) => t.id !== threadId));
+      await removeThread({ id: threadId as any });
       toast.success("Chat deleted");
     } catch {
       toast.error("Failed to delete chat");
