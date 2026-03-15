@@ -123,7 +123,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
           scale: {
             color: {
               type: "threshold",
-              range: ["#0e4429", "#006d32", "#26a641", "#39d353"],
+              range: ["#14432a", "#166b34", "#37a446", "#4dd05a"],
               domain: [1, 2, 3],
             },
           },
@@ -197,7 +197,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
   return (
     <div
       data-theme="dark"
-      className="min-w-0 flex-1 overflow-x-auto rounded-md bg-card p-4 text-foreground"
+      className="min-w-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card p-4 text-foreground"
     >
       <div ref={containerRef} />
       <div className="mt-2 flex items-center justify-end gap-1 text-xs text-muted-foreground">

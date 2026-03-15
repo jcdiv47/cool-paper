@@ -168,11 +168,11 @@ export default function PaperPage({
         </p>
         <div className="flex-1" />
         <div className="flex shrink-0 items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border/40 p-0.5">
+          <div className="flex items-center rounded-lg border border-border bg-secondary p-0.5">
             <Button
               variant={view === "summary" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 gap-1.5 text-xs"
+              className={`h-7 gap-1.5 text-xs transition-all ${view === "summary" ? "shadow-sm" : ""}`}
               onClick={() => switchView("summary")}
             >
               <AlignLeft className="h-3.5 w-3.5" />
@@ -181,7 +181,7 @@ export default function PaperPage({
             <Button
               variant={view === "pdf" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 gap-1.5 text-xs"
+              className={`h-7 gap-1.5 text-xs transition-all ${view === "pdf" ? "shadow-sm" : ""}`}
               onClick={() => switchView("pdf")}
             >
               <BookOpen className="h-3.5 w-3.5" />
@@ -190,7 +190,7 @@ export default function PaperPage({
             <Button
               variant={view === "note" ? "secondary" : "ghost"}
               size="sm"
-              className="h-7 gap-1.5 text-xs"
+              className={`h-7 gap-1.5 text-xs transition-all ${view === "note" ? "shadow-sm" : ""}`}
               onClick={() => {
                 if (!selectedNote && notes.length > 0) {
                   setSelectedNote(notes[0]!.filename);
@@ -234,18 +234,20 @@ export default function PaperPage({
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
-                  <FileText className="h-10 w-10 text-muted-foreground/30" />
+                  <div className="flex h-14 w-14 items-center justify-center bg-secondary">
+                    <PenLine className="h-6 w-6 text-primary" />
+                  </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-base font-semibold text-foreground">
                       No notes yet for this paper
                     </p>
-                    <p className="text-xs text-muted-foreground/60">
+                    <p className="text-sm text-muted-foreground">
                       Generate AI-powered notes to summarize, review, or analyze this paper
                     </p>
                   </div>
                   <Button
-                    variant="outline"
                     onClick={() => setGenerateOpen(true)}
+                    className="gap-1.5"
                   >
                     <PenLine className="h-4 w-4" />
                     Generate Note
@@ -271,7 +273,7 @@ export default function PaperPage({
               ${mobileSidebar ? "translate-y-0" : "translate-y-full md:translate-y-0"}
             `}>
               <Button variant="ghost" onClick={() => setMobileSidebar(false)} className="flex justify-center py-2 md:hidden" aria-label="Close sidebar">
-                <div className="h-1 w-8 rounded-full bg-muted-foreground/30" />
+                <div className="h-1 w-8 bg-muted-foreground/30" />
               </Button>
               <NotesSidebar
                 key={notesKey}
@@ -308,13 +310,13 @@ export default function PaperPage({
         <Button
           variant="outline"
           size="icon-lg"
-          className={`fixed bottom-6 right-6 z-30 rounded-full shadow-md transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`fixed bottom-6 right-6 z-30 transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
           onClick={() => setMobileSidebar(true)}
           aria-label="Open sidebar"
         >
           <FileText className="h-4.5 w-4.5 text-foreground" />
           {notes.length > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center bg-foreground px-1 text-[10px] font-medium text-background">
               {notes.length}
             </span>
           )}

@@ -53,11 +53,13 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
 
   if (threads.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <MessageCircle className="h-10 w-10 text-muted-foreground/30" />
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">No chats yet</p>
-          <p className="text-xs text-muted-foreground/60">
+      <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
+        <div className="flex h-14 w-14 items-center justify-center bg-secondary">
+          <MessageCircle className="h-6 w-6 text-primary" />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-foreground">No chats yet</p>
+          <p className="text-sm text-muted-foreground">
             Start a new chat to discuss your papers
           </p>
         </div>
@@ -73,9 +75,9 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
             <Button
               variant="ghost"
               onClick={() => onSelect(thread.id)}
-              className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/30 px-4 py-3 text-left font-normal hover:border-border/60 hover:bg-muted/20"
+              className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground transition-colors duration-200 hover:bg-secondary hover:text-foreground"
             >
-              <p className="text-sm font-medium leading-tight pr-8">{thread.title}</p>
+              <p className="text-sm font-medium leading-tight pr-8 transition-colors duration-300 group-hover:text-primary">{thread.title}</p>
               {thread.paperTitles.length > 0 && (
                 <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/60">
                   {thread.paperTitles.map((title, i) => (

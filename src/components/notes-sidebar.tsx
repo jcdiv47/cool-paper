@@ -121,12 +121,14 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
               </>
             ) : (
               <>
-                <FileText className="h-8 w-8 text-muted-foreground/50" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
+                  <p className="text-sm font-semibold text-foreground">
                     No notes yet
                   </p>
-                  <p className="text-xs text-muted-foreground/60">
+                  <p className="text-xs text-muted-foreground">
                     Generate AI notes or add them manually
                   </p>
                 </div>
@@ -143,7 +145,7 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
                     onClick={() => onSelectNote(note.filename)}
                     className={`flex h-auto w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left font-normal ${
                       selectedNote === note.filename
-                        ? "bg-primary/10 ring-1 ring-primary/20 text-foreground"
+                        ? "bg-primary/10 text-foreground"
                         : ""
                     }`}
                   >

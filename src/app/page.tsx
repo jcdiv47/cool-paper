@@ -12,7 +12,7 @@ import { StatsBlock } from "@/components/stats-block";
 import { AddPaperDialog } from "@/components/add-paper-dialog";
 import { PaperPickerDialog } from "@/components/paper-picker-dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, NotebookPen, ArrowRight } from "lucide-react";
+import { Plus, FileText, NotebookPen, ArrowRight, Sparkles } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { MODEL_OPTIONS } from "@/lib/models";
 import type { PaperMetadata, RecentNote } from "@/types";
@@ -22,11 +22,9 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const [notePickerOpen, setNotePickerOpen] = useState(false);
 
-  // Papers from Convex (realtime)
   const convexPapers = useQuery(api.papers.list);
   const loading = convexPapers === undefined;
 
-  // Map Convex papers to PaperMetadata shape for components
   const papers: PaperMetadata[] = (convexPapers ?? []).map((p) => ({
     arxivId: p.arxivId,
     title: p.title,
@@ -37,7 +35,6 @@ export default function Home() {
     addedAt: p.addedAt,
   }));
 
-  // Recent notes from Convex
   const convexRecentNotes = useQuery(api.notes.recentNotes, { limit: 6 });
   const recentNotes: RecentNote[] = (convexRecentNotes ?? []).map((n) => ({
     paperId: n.sanitizedPaperId,
@@ -48,11 +45,9 @@ export default function Home() {
     model: n.model,
   }));
 
-  // Note counts from Convex
   const convexAllNotes = useQuery(api.notes.countByPapers);
   const noteCounts: Record<string, number> = convexAllNotes ?? {};
 
-  // Keyboard shortcut
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -89,7 +84,6 @@ export default function Home() {
     return new Date(dateStr).toLocaleDateString();
   }
 
-  // Callback to trigger after adding paper - no longer need manual fetch
   const handlePaperAdded = useCallback(() => {
     toast.success("Paper added successfully");
   }, []);
@@ -112,27 +106,27 @@ export default function Home() {
           </kbd>
         </Button>
       </Header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         {loading ? (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <div className="h-10 w-full max-w-md animate-pulse rounded-lg bg-muted/20" />
-              <div className="h-3 w-24 animate-pulse rounded bg-muted/15" />
+          <div className="space-y-8">
+            <div className="space-y-3">
+              <div className="h-10 w-full max-w-md animate-shimmer rounded-lg" />
+              <div className="h-3 w-24 animate-shimmer rounded" />
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="animate-card-enter rounded-lg border border-border/20 p-5"
-                  style={{ animationDelay: `${i * 50}ms` }}
+                  className="animate-card-enter rounded-xl border border-border/20 p-5"
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
-                  <div className="space-y-2.5">
-                    <div className="h-3 w-20 animate-pulse rounded bg-muted/15" />
-                    <div className="h-5 w-3/4 animate-pulse rounded bg-muted/20" />
-                    <div className="h-3 w-1/2 animate-pulse rounded bg-muted/12" />
+                  <div className="space-y-3">
+                    <div className="h-3 w-20 animate-shimmer rounded" />
+                    <div className="h-5 w-3/4 animate-shimmer rounded" />
+                    <div className="h-3 w-1/2 animate-shimmer rounded" />
                     <div className="space-y-1.5">
-                      <div className="h-3 w-full animate-pulse rounded bg-muted/10" />
-                      <div className="h-3 w-5/6 animate-pulse rounded bg-muted/10" />
+                      <div className="h-3 w-full animate-shimmer rounded" />
+                      <div className="h-3 w-5/6 animate-shimmer rounded" />
                     </div>
                   </div>
                 </div>
@@ -140,10 +134,10 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-14">
             {/* Stats + Heatmap */}
             {papers.length > 0 && (
-              <div className="flex flex-col gap-4 sm:flex-row sm:gap-8">
+              <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
                 <StatsBlock papers={papers} />
                 <ActivityHeatmap papers={papers} />
               </div>
@@ -151,15 +145,22 @@ export default function Home() {
 
             {/* Recently Added Papers */}
             <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-medium text-foreground">
-                  Recently Added Papers
-                </h2>
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-serif text-xl font-semibold tracking-tight text-foreground">
+                    Recent Papers
+                  </h2>
+                  {papers.length > 0 && (
+                    <span className="bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                      {papers.length}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {papers.length > 6 && (
                     <Link
                       href="/paper"
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       View all
                       <ArrowRight className="h-3 w-3" />
@@ -176,16 +177,22 @@ export default function Home() {
                 </div>
               </div>
               {recentPapers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/40 py-16 text-center">
-                  <FileText className="h-8 w-8 text-muted-foreground/30" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
+                <div className="flex flex-col items-center justify-center gap-6 rounded-xl border border-border bg-card py-24 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center bg-primary/10">
+                    <Sparkles className="h-7 w-7 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-serif text-lg font-semibold text-foreground">
                       Your library is empty
                     </p>
-                    <p className="text-xs text-muted-foreground/60">
-                      Add an arXiv paper to get started
+                    <p className="text-sm text-muted-foreground">
+                      Add an arXiv paper to start building your collection
                     </p>
                   </div>
+                  <Button onClick={() => setAddOpen(true)} className="gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Add Your First Paper
+                  </Button>
                 </div>
               ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -204,15 +211,22 @@ export default function Home() {
 
             {/* Recent Notes */}
             <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-base font-medium text-foreground">
-                  Recent Notes
-                </h2>
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-serif text-xl font-semibold tracking-tight text-foreground">
+                    Recent Notes
+                  </h2>
+                  {recentNotes.length > 0 && (
+                    <span className="bg-chart-3/10 px-2.5 py-0.5 text-[11px] font-semibold text-chart-3">
+                      {recentNotes.length}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   {recentNotes.length > 0 && (
                     <Link
                       href="/notes"
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
                     >
                       View all
                       <ArrowRight className="h-3 w-3" />
@@ -231,14 +245,16 @@ export default function Home() {
                 </div>
               </div>
               {recentNotes.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/40 py-16 text-center">
-                  <NotebookPen className="h-8 w-8 text-muted-foreground/30" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">
+                <div className="flex flex-col items-center justify-center gap-6 rounded-xl border border-border bg-card py-24 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center bg-chart-3/10">
+                    <NotebookPen className="h-7 w-7 text-chart-3" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-serif text-lg font-semibold text-foreground">
                       No notes yet
                     </p>
-                    <p className="text-xs text-muted-foreground/60">
-                      Generate notes from your papers to see them here
+                    <p className="text-sm text-muted-foreground">
+                      Generate AI-powered notes from your papers
                     </p>
                   </div>
                 </div>
@@ -249,10 +265,10 @@ export default function Home() {
                       key={`${note.paperId}-${note.filename}`}
                       href={`/paper/${note.paperId}?tab=notes`}
                       className="animate-card-enter block"
-                      style={{ animationDelay: `${i * 50}ms` }}
+                      style={{ animationDelay: `${i * 60}ms` }}
                     >
-                      <div className="group flex h-full flex-col gap-1.5 rounded-lg border border-border/40 bg-card/40 px-5 py-3.5 transition-colors duration-200 hover:border-border hover:bg-card/70">
-                        <p className="text-sm font-medium leading-snug capitalize">
+                      <div className="group flex h-full flex-col gap-2.5 rounded-xl border border-border bg-card px-5 py-4 transition-colors duration-200 hover:bg-secondary">
+                        <p className="text-sm font-semibold leading-snug capitalize transition-colors duration-300 group-hover:text-primary">
                           {note.title}
                         </p>
                         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">
@@ -279,6 +295,17 @@ export default function Home() {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-border py-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
+          <span className="font-serif text-xs text-muted-foreground/40">Cool Paper</span>
+          <span className="text-[11px] text-muted-foreground/30">
+            Immersive arXiv reader
+          </span>
+        </div>
+      </footer>
+
       <AddPaperDialog
         open={addOpen}
         onOpenChange={setAddOpen}

@@ -71,30 +71,34 @@ export function StatsBlock({ papers }: StatsBlockProps) {
   }, [noteCount, chatCount]);
 
   const stats = [
-    { value: paperCount, label: "Papers", icon: FileText },
-    { value: noteCount, label: "Notes", icon: NotebookPen },
-    { value: categoryCount, label: "Topics", icon: Tag },
-    { value: chatCount, label: "Chats", icon: MessageCircle },
+    { value: paperCount, label: "Papers", icon: FileText, color: "text-primary" },
+    { value: noteCount, label: "Notes", icon: NotebookPen, color: "text-chart-3" },
+    { value: categoryCount, label: "Topics", icon: Tag, color: "text-chart-2" },
+    { value: chatCount, label: "Chats", icon: MessageCircle, color: "text-chart-4" },
   ];
 
   return (
-    <div className="grid shrink-0 grid-cols-2 gap-x-12 gap-y-4 py-2 sm:w-64 sm:px-6">
+    <div className="grid shrink-0 grid-cols-2 gap-3 sm:w-72">
       {stats.map((s, i) => (
         <div
           key={s.label}
-          className="animate-card-enter flex items-center gap-2.5"
+          className="animate-card-enter flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
           style={{ animationDelay: `${i * 80}ms` }}
         >
-          <s.icon className="h-5 w-5 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
-          <div className="font-serif text-3xl tabular-nums tracking-tight text-foreground">
-            {s.value === null ? (
-              <span className="inline-block h-8 w-6 animate-pulse rounded bg-muted/15" />
-            ) : (
-              s.value
-            )}
+          <div className={`rounded-lg bg-secondary p-1.5 ${s.color}`}>
+            <s.icon className="h-4 w-4" strokeWidth={1.8} />
           </div>
-          <div className="text-sm uppercase tracking-widest text-muted-foreground/70">
-            {s.label}
+          <div>
+            <div className="font-serif text-2xl font-semibold tabular-nums tracking-tight text-primary">
+              {s.value === null ? (
+                <span className="inline-block h-7 w-5 animate-shimmer rounded" />
+              ) : (
+                s.value
+              )}
+            </div>
+            <div className="text-[11px] font-medium text-muted-foreground/60">
+              {s.label}
+            </div>
           </div>
         </div>
       ))}

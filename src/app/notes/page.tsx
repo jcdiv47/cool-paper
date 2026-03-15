@@ -63,13 +63,15 @@ export default function NotesListPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-            <NotebookPen className="h-10 w-10 text-muted-foreground/30" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
+          <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
+            <div className="flex h-14 w-14 items-center justify-center bg-secondary">
+              <NotebookPen className="h-6 w-6 text-chart-3" />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-sm font-semibold text-foreground">
                 {notes.length === 0 ? "No notes yet" : "No matching notes"}
               </p>
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-sm text-muted-foreground">
                 {notes.length === 0
                   ? "Generate notes from your papers to see them here"
                   : "Try a different search term"}
@@ -85,8 +87,8 @@ export default function NotesListPage() {
                 className="animate-card-enter block"
                 style={{ animationDelay: `${i * 30}ms` }}
               >
-                <div className="group flex flex-col gap-1.5 rounded-xl border border-border/30 px-4 py-3 transition-colors duration-200 hover:border-border/60 hover:bg-muted/20">
-                  <p className="text-sm font-medium leading-tight capitalize">
+                <div className="group flex flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3.5 transition-colors duration-200 hover:bg-secondary">
+                  <p className="text-sm font-medium leading-tight capitalize transition-colors duration-300 group-hover:text-primary">
                     {note.title}
                   </p>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">

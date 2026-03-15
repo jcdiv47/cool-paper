@@ -55,13 +55,15 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
 
   if (filtered.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 py-20 text-center">
-        <FileText className="h-10 w-10 text-muted-foreground/30" />
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">
+      <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
+        <div className="flex h-14 w-14 items-center justify-center bg-secondary">
+          <FileText className="h-6 w-6 text-primary" />
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-foreground">
             {papers.length === 0 ? "No papers yet" : "No matching papers"}
           </p>
-          <p className="text-xs text-muted-foreground/60">
+          <p className="text-sm text-muted-foreground">
             {papers.length === 0
               ? "Add a paper from arXiv to get started"
               : "Try a different search term"}
@@ -81,15 +83,15 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
               <Button
                 variant="ghost"
                 onClick={() => onSelect(sanitizedId)}
-                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/30 px-4 py-3 text-left font-normal whitespace-normal overflow-hidden hover:border-border/60 hover:bg-muted/20"
+                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground whitespace-normal overflow-hidden transition-colors duration-200 hover:bg-secondary hover:text-foreground"
               >
-                <p className="text-sm font-medium leading-tight pr-8 line-clamp-2">
+                <p className="text-sm font-semibold leading-tight pr-8 line-clamp-2 transition-colors duration-300 group-hover:text-primary">
                   {paper.title}
                 </p>
-                <span className="font-mono text-[11px] text-muted-foreground/40">
+                <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/50">
                   arXiv:{paper.arxivId}
                 </span>
-                <p className="text-xs leading-relaxed text-muted-foreground/60 line-clamp-2">
+                <p className="text-xs leading-relaxed text-muted-foreground/50 line-clamp-2">
                   {paper.abstract}
                 </p>
               </Button>

@@ -218,12 +218,14 @@ export function ChatView({
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
-              <MessageCircle className="h-10 w-10 text-muted-foreground/30" />
+              <div className="flex h-14 w-14 items-center justify-center bg-secondary">
+                <MessageCircle className="h-6 w-6 text-primary" />
+              </div>
               <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-base font-semibold text-foreground">
                   {emptyHeading}
                 </p>
-                <p className="text-xs text-muted-foreground/60">
+                <p className="text-sm text-muted-foreground">
                   The AI can read paper source files to answer your questions
                 </p>
               </div>
@@ -234,7 +236,7 @@ export function ChatView({
                     variant="outline"
                     size="sm"
                     onClick={() => onSendMessage(s)}
-                    className="rounded-full font-normal text-muted-foreground"
+                    className="border-border font-normal text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
                   >
                     {s}
                   </Button>
@@ -252,7 +254,7 @@ export function ChatView({
                   <div key={i}>
                     {msg.role === "user" ? (
                       <div className="flex justify-end">
-                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-muted/40 px-4 py-2.5">
+                        <div className="max-w-[85%] bg-primary/10 px-4 py-2.5">
                           <p className="text-sm leading-relaxed whitespace-pre-wrap">
                             {msg.content}
                           </p>
@@ -276,7 +278,7 @@ export function ChatView({
                           />
                         ) : null}
                         {msg.content ? (
-                          <article className="prose prose-zinc dark:prose-invert prose-sm max-w-none font-serif">
+                          <article className="prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif">
                             <ReactMarkdown
                               remarkPlugins={[remarkGfm, remarkMath]}
                               rehypePlugins={[rehypeHighlight, rehypeKatex]}
@@ -334,7 +336,7 @@ export function ChatView({
             onKeyDown={handleKeyDown}
             placeholder={placeholderText}
             rows={1}
-            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border border-border/60 bg-muted/20 px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-border focus:bg-background"
+            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary focus:bg-background"
             disabled={isStreaming}
           />
           {isStreaming ? (
@@ -348,9 +350,8 @@ export function ChatView({
             </Button>
           ) : (
             <Button
-              variant="ghost"
               size="icon"
-              className="h-10 w-10 shrink-0"
+              className={`h-10 w-10 shrink-0 transition-colors ${input.trim() ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-transparent text-muted-foreground hover:bg-secondary"}`}
               onClick={handleSubmit}
               disabled={!input.trim()}
             >

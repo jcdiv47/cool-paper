@@ -55,17 +55,17 @@ export function PaperCard({
       <Link
         href={`/paper/${sanitizedId}`}
         className="animate-card-enter block"
-        style={{ animationDelay: `${index * 50}ms` }}
+        style={{ animationDelay: `${index * 60}ms` }}
       >
-        <Card className="group h-full border-border/40 bg-card/40 transition-colors duration-200 hover:border-border hover:bg-card/70">
-          <div className="space-y-2 px-5 py-3.5">
+        <Card className="group h-full border-border bg-card transition-colors duration-200 hover:bg-secondary">
+          <div className="space-y-2.5 px-5 py-4">
             {/* Meta row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
-                <span className="font-mono uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">
+                <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
                   {paper.categories[0]}
                 </span>
-                <span>·</span>
+                <span className="text-border">·</span>
                 <time>{dateStr}</time>
               </div>
               <Button
@@ -83,26 +83,26 @@ export function PaperCard({
             </div>
 
             {/* Title */}
-            <h3 className="font-serif text-base font-medium leading-snug tracking-tight line-clamp-2">
+            <h3 className="font-serif text-base font-semibold leading-snug tracking-tight line-clamp-2 group-hover:text-primary transition-colors duration-300">
               {paper.title}
             </h3>
 
             {/* Authors */}
-            <p className="text-[12px] italic text-muted-foreground/70">
+            <p className="text-[12px] text-muted-foreground/60">
               {truncatedAuthors}
             </p>
 
             {/* Abstract */}
-            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/50">
+            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/40">
               {abstractExcerpt}
             </p>
 
             {/* Category tags + note count */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
               {paper.categories.slice(0, 3).map((cat) => (
                 <span
                   key={cat}
-                  className="rounded border border-border/50 px-1.5 py-px font-mono text-[10px] text-muted-foreground/40"
+                  className="rounded-md border border-border bg-secondary px-1.5 py-px font-mono text-[10px] text-muted-foreground"
                 >
                   {cat}
                 </span>
@@ -111,7 +111,7 @@ export function PaperCard({
                 <Button
                   variant="ghost"
                   size="xs"
-                  className="text-[11px] text-muted-foreground/80 hover:text-foreground"
+                  className="text-[11px] text-primary/60 hover:text-primary"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
