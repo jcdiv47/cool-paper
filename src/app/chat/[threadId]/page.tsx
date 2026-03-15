@@ -3,9 +3,11 @@
 import { useState, useEffect, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { PaperPickerDialog } from "@/components/paper-picker-dialog";
-import { useChat } from "@/hooks/use-chat";
+import { useConvexChat } from "@/hooks/use-convex-chat";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster, toast } from "sonner";
@@ -33,12 +35,25 @@ export default function ActiveChatPage({
   const { threadId } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const chat = useChat();
-  const [papers, setPapers] = useState<PaperMetadata[]>([]);
+  const chat = useConvexChat();
   const [loading, setLoading] = useState(threadId !== "new");
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const isNew = threadId === "new";
+
+  // Resolve paper metadata from Convex
+  const convexPapers = useQuery(api.papers.list);
+  const papers: PaperMetadata[] = (convexPapers ?? [])
+    .filter((p) => chat.paperIds.includes(p.sanitizedId))
+    .map((p) => ({
+      arxivId: p.arxivId,
+      title: p.title,
+      authors: p.authors,
+      abstract: p.abstract,
+      published: p.published,
+      categories: p.categories,
+      addedAt: p.addedAt,
+    }));
 
   // For new chats: read paperIds from query params
   useEffect(() => {
@@ -50,7 +65,7 @@ export default function ActiveChatPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, searchParams]);
 
-  // For existing chats: load thread from API
+  // For existing chats: load thread
   useEffect(() => {
     if (isNew) return;
     async function load() {
@@ -73,26 +88,6 @@ export default function ActiveChatPage({
       router.replace(`/chat/${chat.threadId}`);
     }
   }, [isNew, chat.threadId, router]);
-
-  // Fetch paper metadata when paperIds change
-  useEffect(() => {
-    if (chat.paperIds.length === 0) return;
-    async function fetchPapers() {
-      const fetched: PaperMetadata[] = [];
-      for (const pid of chat.paperIds) {
-        try {
-          const res = await fetch(`/api/papers/${pid}`);
-          if (res.ok) {
-            fetched.push(await res.json());
-          }
-        } catch {
-          // skip missing papers
-        }
-      }
-      setPapers(fetched);
-    }
-    fetchPapers();
-  }, [chat.paperIds]);
 
   async function handleAddPaper(paperIds: string[]) {
     for (const pid of paperIds) {

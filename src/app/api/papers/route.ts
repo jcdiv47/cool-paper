@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { listPapers, createPaper } from "@/lib/papers";
-import { extractArxivId } from "@/lib/constants";
+import { createPaper } from "@/lib/papers";
+import { extractArxivId, sanitizeArxivId } from "@/lib/constants";
+import { getConvexClient } from "@/lib/convex-client";
+import { api } from "../../../../convex/_generated/api";
 
 export async function GET() {
-  const papers = await listPapers();
+  // Papers are now read from Convex on the client side via useQuery.
+  // This endpoint is kept for backward compatibility but proxies to Convex.
+  const convex = getConvexClient();
+  const papers = await convex.query(api.papers.list);
   return NextResponse.json(papers);
 }
 
@@ -19,7 +24,22 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Download files to disk (PDF, source, metadata)
     const paper = await createPaper(arxivId);
+
+    // Also write to Convex
+    const convex = getConvexClient();
+    await convex.mutation(api.papers.create, {
+      arxivId: paper.arxivId,
+      sanitizedId: sanitizeArxivId(paper.arxivId),
+      title: paper.title,
+      authors: paper.authors,
+      abstract: paper.abstract,
+      published: paper.published,
+      categories: paper.categories,
+      addedAt: paper.addedAt,
+    });
+
     return NextResponse.json(paper);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to add paper";

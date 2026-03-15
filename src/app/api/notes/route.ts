@@ -1,35 +1,22 @@
 import { NextResponse } from "next/server";
-import { listPapers } from "@/lib/papers";
-import { listNotes } from "@/lib/notes";
-import { sanitizeArxivId } from "@/lib/constants";
-import type { RecentNote } from "@/types";
+import { getConvexClient } from "@/lib/convex-client";
+import { api } from "../../../../convex/_generated/api";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Number(searchParams.get("limit")) || 6, 50);
 
-  const papers = await listPapers();
-  const allNotes: RecentNote[] = [];
+  const convex = getConvexClient();
+  const notes = await convex.query(api.notes.recentNotes, { limit });
 
-  for (const paper of papers) {
-    const sanitizedId = sanitizeArxivId(paper.arxivId);
-    const notes = await listNotes(sanitizedId);
-    for (const note of notes) {
-      allNotes.push({
-        paperId: sanitizedId,
-        paperTitle: paper.title,
-        filename: note.filename,
-        title: note.title,
-        modifiedAt: note.modifiedAt,
-        model: note.model,
-      });
-    }
-  }
+  const result = notes.map((n) => ({
+    paperId: n.sanitizedPaperId,
+    paperTitle: n.paperTitle,
+    filename: n.filename,
+    title: n.title,
+    modifiedAt: n.modifiedAt,
+    model: n.model,
+  }));
 
-  allNotes.sort(
-    (a, b) =>
-      new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
-  );
-
-  return NextResponse.json(allNotes.slice(0, limit));
+  return NextResponse.json(result);
 }

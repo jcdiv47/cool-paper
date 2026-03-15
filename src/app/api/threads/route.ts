@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { listChatThreads, saveChatThread } from "@/lib/chat-threads";
-import type { Thread } from "@/types";
+import { getConvexClient } from "@/lib/convex-client";
+import { api } from "../../../../convex/_generated/api";
 
 export async function GET() {
-  const threads = await listChatThreads();
+  const convex = getConvexClient();
+  const threads = await convex.query(api.threads.list);
   return NextResponse.json(threads);
 }
 
@@ -17,19 +18,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  const threadId = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-
-  const thread: Thread = {
-    id: threadId,
+  const convex = getConvexClient();
+  const now = new Date().toISOString();
+  const threadId = await convex.mutation(api.threads.create, {
     title: "New chat",
     paperIds,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    messages: [],
-  };
+    createdAt: now,
+    updatedAt: now,
+  });
 
-  await saveChatThread(thread);
-  return NextResponse.json(thread, { status: 201 });
+  return NextResponse.json({ id: threadId, paperIds }, { status: 201 });
 }

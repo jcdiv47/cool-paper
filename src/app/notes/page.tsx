@@ -1,32 +1,28 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { FileText, NotebookPen } from "lucide-react";
 import { MODEL_OPTIONS } from "@/lib/models";
 import type { RecentNote } from "@/types";
 
 export default function NotesListPage() {
-  const [notes, setNotes] = useState<RecentNote[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const fetchNotes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notes?limit=50");
-      const data = await res.json();
-      setNotes(data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const convexNotes = useQuery(api.notes.recentNotes, { limit: 50 });
+  const loading = convexNotes === undefined;
 
-  useEffect(() => {
-    fetchNotes();
-  }, [fetchNotes]);
+  const notes: RecentNote[] = (convexNotes ?? []).map((n) => ({
+    paperId: n.sanitizedPaperId,
+    paperTitle: n.paperTitle,
+    filename: n.filename,
+    title: n.title,
+    modifiedAt: n.modifiedAt,
+    model: n.model,
+  }));
 
   function timeAgo(dateStr: string): string {
     const now = Date.now();

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPaper, deletePaper } from "@/lib/papers";
+import { getConvexClient } from "@/lib/convex-client";
+import { api } from "../../../../../convex/_generated/api";
 
 export async function GET(
   _request: Request,
@@ -18,6 +20,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  // Delete from disk
   await deletePaper(id);
+
+  // Delete from Convex (cascade deletes notes, jobs, events)
+  const convex = getConvexClient();
+  await convex.mutation(api.papers.removeBySanitizedId, { sanitizedId: id });
+
   return NextResponse.json({ success: true });
 }

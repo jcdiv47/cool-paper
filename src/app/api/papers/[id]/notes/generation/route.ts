@@ -1,123 +1,48 @@
 import { NextResponse } from "next/server";
 import { sanitizeArxivId } from "@/lib/constants";
-import { getJob, addListener, cancelJob } from "@/lib/job-store";
-import {
-  readGenerationStatus,
-  writeGenerationStatus,
-} from "@/lib/generation-status";
+import { getConvexClient } from "@/lib/convex-client";
+import { api } from "../../../../../../../convex/_generated/api";
+import { cancelJobByConvexId, getAbortController } from "@/app/api/generate/route";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
   const sanitizedId = sanitizeArxivId(id);
-  const url = new URL(request.url);
-  const isStream = url.searchParams.has("stream");
+  const convex = getConvexClient();
 
-  if (!isStream) {
-    // JSON status check
-    const job = getJob(sanitizedId);
-    if (job) {
-      return NextResponse.json({
-        active: job.status === "running",
-        jobId: job.jobId,
-        status: job.status,
-        noteFilename: job.noteFilename,
-      });
-    }
+  const job = await convex.query(api.jobs.getForPaper, {
+    sanitizedPaperId: sanitizedId,
+  });
 
-    // Fall back to disk status
-    const diskStatus = await readGenerationStatus(sanitizedId);
-    if (diskStatus) {
-      if (diskStatus.status === "running") {
-        // Orphaned: server restarted while generation was running
-        const updated = { ...diskStatus, status: "failed" as const, completedAt: new Date().toISOString(), error: "Server restarted" };
-        await writeGenerationStatus(sanitizedId, updated);
-        return NextResponse.json({
-          active: false,
-          jobId: diskStatus.jobId,
-          status: "failed",
-          noteFilename: diskStatus.noteFilename,
-        });
-      }
-      return NextResponse.json({
-        active: false,
-        jobId: diskStatus.jobId,
-        status: diskStatus.status,
-        noteFilename: diskStatus.noteFilename,
-      });
-    }
-
+  if (!job) {
     return NextResponse.json({ active: false });
   }
 
-  // SSE stream mode
-  const job = getJob(sanitizedId);
-  if (!job) {
-    return NextResponse.json({ error: "No active job" }, { status: 404 });
+  // Detect orphaned jobs: still "running" in Convex but no in-memory abort
+  // controller (server restarted while the job was in progress)
+  if (job.status === "running" && !getAbortController(job._id)) {
+    await convex.mutation(api.jobs.complete, {
+      id: job._id,
+      status: "failed",
+      error: "Job process lost (server restart)",
+    });
+    return NextResponse.json({
+      active: false,
+      convexJobId: job._id,
+      status: "failed",
+      noteFilename: job.noteFilename,
+    });
   }
 
-  const encoder = new TextEncoder();
-
-  const stream = new ReadableStream({
-    start(controller) {
-      function send(data: Record<string, unknown>, eventId?: number) {
-        try {
-          let msg = "";
-          if (eventId !== undefined) {
-            msg += `id: ${eventId}\n`;
-          }
-          msg += `data: ${JSON.stringify(data)}\n\n`;
-          controller.enqueue(encoder.encode(msg));
-        } catch {
-          // Controller closed
-        }
-      }
-
-      // Replay buffered events
-      for (const event of job.events) {
-        send(event.data, event.id);
-      }
-
-      // If job is already done, close the stream
-      if (job.status !== "running") {
-        controller.close();
-        return;
-      }
-
-      // Register for live events
-      const unsubscribe = addListener(sanitizedId, (event) => {
-        send(event.data, event.id);
-        if (event.data.type === "done") {
-          try {
-            controller.close();
-          } catch {
-            // Already closed
-          }
-        }
-      });
-
-      // Clean up when client disconnects (do NOT cancel the agent)
-      request.signal.addEventListener("abort", () => {
-        if (unsubscribe) unsubscribe();
-        try {
-          controller.close();
-        } catch {
-          // Already closed
-        }
-      });
-    },
-  });
-
-  return new NextResponse(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
+  return NextResponse.json({
+    active: job.status === "running",
+    convexJobId: job._id,
+    status: job.status,
+    noteFilename: job.noteFilename,
   });
 }
 
@@ -127,15 +52,24 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const sanitizedId = sanitizeArxivId(id);
+  const convex = getConvexClient();
 
-  const cancelled = cancelJob(sanitizedId);
-  if (!cancelled) {
+  const job = await convex.query(api.jobs.getForPaper, {
+    sanitizedPaperId: sanitizedId,
+  });
+
+  if (!job || job.status !== "running") {
     return NextResponse.json(
       { error: "No running job to cancel" },
       { status: 404 }
     );
   }
 
-  // The agent's catch block will handle status updates via completeJob/writeGenerationStatus
+  // Cancel in-memory abort controller
+  cancelJobByConvexId(job._id);
+
+  // Mark cancelled in Convex
+  await convex.mutation(api.jobs.cancel, { id: job._id });
+
   return NextResponse.json({ cancelled: true });
 }

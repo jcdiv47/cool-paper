@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,9 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Loader2, PenLine, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { FileText, Loader2, PenLine, Search, Trash2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useCachedFetch } from "@/hooks/use-cached-fetch";
 import { MODEL_OPTIONS } from "@/lib/models";
 import type { NoteFile } from "@/types";
 
@@ -31,69 +32,36 @@ interface NotesSidebarProps {
   onNotesLoaded?: (notes: NoteFile[]) => void;
 }
 
-export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, onSelectNote, onDeleteNote, onNotesLoaded }: NotesSidebarProps) {
-  const { data: fetchedNotes, loading, refetch: fetchNotes } = useCachedFetch<NoteFile[]>(
-    `/api/papers/${paperId}/notes`,
-    { cacheKey: `paper:notes:${paperId}` }
-  );
-
-  const notes = fetchedNotes ?? [];
-  const [displayNotes, setDisplayNotes] = useState<NoteFile[]>([]);
+export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, onSelectNote, onDeleteNote }: NotesSidebarProps) {
   const [search, setSearch] = useState("");
-  const [searching, setSearching] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Sync displayNotes and notify parent when fetched notes change
-  useEffect(() => {
-    if (fetchedNotes) {
-      setDisplayNotes(fetchedNotes);
-      onNotesLoaded?.(fetchedNotes);
-    }
-  }, [fetchedNotes]);
-
-  const handleSearch = useCallback(
-    (q: string) => {
-      setSearch(q);
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-
-      if (!q.trim()) {
-        setDisplayNotes(notes);
-        setSearching(false);
-        return;
-      }
-
-      setSearching(true);
-      debounceRef.current = setTimeout(async () => {
-        try {
-          const res = await fetch(
-            `/api/papers/${paperId}/notes?q=${encodeURIComponent(q.trim())}`
-          );
-          const data = await res.json();
-          setDisplayNotes(data);
-        } catch {
-          setDisplayNotes([]);
-        } finally {
-          setSearching(false);
-        }
-      }, 300);
-    },
-    [paperId, notes]
+  // Notes from Convex (realtime)
+  const allNotes = useQuery(api.notes.listByPaper, { sanitizedPaperId: paperId });
+  const searchResults = useQuery(
+    api.notes.search,
+    search.trim() ? { sanitizedPaperId: paperId, query: search.trim() } : "skip"
   );
+
+  const convexNotes = search.trim() ? searchResults : allNotes;
+  const loading = convexNotes === undefined;
+  const displayNotes: (NoteFile & { snippet?: string })[] = (convexNotes ?? []).map((n) => ({
+    filename: n.filename,
+    title: n.title,
+    modifiedAt: n.modifiedAt,
+    model: n.model,
+    snippet: "snippet" in n ? (n as { snippet?: string }).snippet : undefined,
+  }));
+
+  const handleSearch = useCallback((q: string) => {
+    setSearch(q);
+  }, []);
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border/40 px-4 py-2">
         <h3 className="text-sm font-semibold">Notes</h3>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={fetchNotes}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
           <Button
             variant="default"
             size="sm"
@@ -105,17 +73,15 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
             ) : (
               <PenLine className="h-3 w-3" />
             )}
-            {generating ? "Generating…" : "Generate"}
+            {generating ? "Generating..." : "Generate"}
           </Button>
         </div>
       </div>
 
-      {notes.length > 0 && (
+      {((allNotes ?? []).length > 0 || search) && (
         <div className="relative px-3 py-2">
           <Search className="absolute left-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          {searching ? (
-            <Loader2 className="absolute right-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
-          ) : search && (
+          {search && (
             <Button
               variant="ghost"
               size="icon-xs"
@@ -126,7 +92,7 @@ export function NotesSidebar({ paperId, generating, selectedNote, onGenerate, on
             </Button>
           )}
           <Input
-            placeholder="Search notes…"
+            placeholder="Search notes..."
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             className="h-8 pl-8 pr-8 text-xs"

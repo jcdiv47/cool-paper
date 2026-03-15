@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { AddPaperDialog } from "@/components/add-paper-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Toaster, toast } from "sonner";
-import { removeByPrefix } from "@/lib/cache";
 import type { PaperMetadata } from "@/types";
 
 interface PaperListProps {
@@ -140,41 +141,31 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
 
 export default function PaperListPage() {
   const router = useRouter();
-  const [papers, setPapers] = useState<PaperMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const fetchPapers = useCallback(async () => {
-    try {
-      const res = await fetch("/api/papers");
-      const data = await res.json();
-      setPapers(data);
-    } catch {
-      toast.error("Failed to load papers");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const convexPapers = useQuery(api.papers.list);
+  const loading = convexPapers === undefined;
 
-  useEffect(() => {
-    fetchPapers();
-  }, [fetchPapers]);
+  const papers: PaperMetadata[] = (convexPapers ?? []).map((p) => ({
+    arxivId: p.arxivId,
+    title: p.title,
+    authors: p.authors,
+    abstract: p.abstract,
+    published: p.published,
+    categories: p.categories,
+    addedAt: p.addedAt,
+  }));
 
-  async function handleDelete(arxivId: string) {
+  const handleDelete = useCallback(async (arxivId: string) => {
     const sanitized = arxivId.replace(/\//g, "_");
     try {
       await fetch(`/api/papers/${sanitized}`, { method: "DELETE" });
-      removeByPrefix(`paper:meta:${sanitized}`);
-      removeByPrefix(`paper:notes:${sanitized}`);
-      removeByPrefix(`paper:note:${sanitized}`);
-      removeByPrefix(`paper:threads:${sanitized}`);
-      setPapers((prev) => prev.filter((p) => p.arxivId !== arxivId));
       toast.success("Paper removed");
     } catch {
       toast.error("Failed to delete paper");
     }
-  }
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -204,7 +195,6 @@ export default function PaperListPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         onAdded={() => {
-          fetchPapers();
           toast.success("Paper added successfully");
         }}
       />
