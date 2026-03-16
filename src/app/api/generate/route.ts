@@ -4,7 +4,6 @@ import { sanitizeArxivId } from "@/lib/constants";
 import { setNoteMeta, getNote } from "@/lib/notes";
 import {
   buildAnnotationPromptBlock,
-  buildAnnotationValidationError,
   validateAnnotationsForPapers,
 } from "@/lib/annotation-links";
 import {
@@ -12,7 +11,7 @@ import {
   executeAgentQuery,
   extractTextFromMessage,
 } from "@/lib/agent";
-import { buildCitationValidationError, validateCitationsForPapers } from "@/lib/citation-validation";
+import { validateCitationsForPapers } from "@/lib/citation-validation";
 import { getConvexClient } from "@/lib/convex-client";
 import { ensurePaperEvidenceIndex } from "@/lib/evidence-index";
 import { api } from "../../../../convex/_generated/api";
@@ -226,8 +225,18 @@ async function syncNoteToConvex(
     { requireAtLeastOneCitation: true }
   );
 
-  if (!citationValidation.isValid) {
-    throw new Error(buildCitationValidationError(citationValidation));
+  if (citationValidation.invalidRefIds.length > 0 || citationValidation.ambiguousRefIds.length > 0) {
+    console.warn(
+      `[syncNote] Dropping ${citationValidation.invalidRefIds.length} invalid + ${citationValidation.ambiguousRefIds.length} ambiguous citation ref(s) for ${sanitizedId}/${noteFilename}`
+    );
+  }
+
+  if (citationValidation.missingRequiredCitations) {
+    throw new Error("Assistant response did not include any citation tokens");
+  }
+
+  if (citationValidation.entries.length === 0 && citationValidation.citations.length > 0) {
+    throw new Error("All citation refs in the generated note are invalid");
   }
 
   const annotationValidation = await validateAnnotationsForPapers(
@@ -236,8 +245,10 @@ async function syncNoteToConvex(
     content,
   );
 
-  if (!annotationValidation.isValid) {
-    throw new Error(buildAnnotationValidationError(annotationValidation));
+  if (annotationValidation.invalidAnnotationIds.length > 0) {
+    console.warn(
+      `[syncNote] Dropping ${annotationValidation.invalidAnnotationIds.length} invalid annotation ref(s) for ${sanitizedId}/${noteFilename}`
+    );
   }
 
   const title = noteFilename.replace(/\.md$/, "").replace(/[-_]/g, " ");

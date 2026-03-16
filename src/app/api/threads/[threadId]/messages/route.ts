@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getPaper } from "@/lib/papers";
 import {
   buildAnnotationPromptBlock,
-  buildAnnotationValidationError,
   validateAnnotationsForPapers,
 } from "@/lib/annotation-links";
 import {
@@ -11,10 +10,7 @@ import {
   extractTextDelta,
   extractThinkingDelta,
 } from "@/lib/agent";
-import {
-  buildCitationValidationError,
-  validateCitationsForPapers,
-} from "@/lib/citation-validation";
+import { validateCitationsForPapers } from "@/lib/citation-validation";
 import { getConvexClient } from "@/lib/convex-client";
 import { ensurePaperEvidenceIndex } from "@/lib/evidence-index";
 import { api } from "../../../../../../convex/_generated/api";
@@ -220,8 +216,18 @@ export async function POST(
       { requireAtLeastOneCitation: true }
     );
 
-    if (!citationValidation.isValid) {
-      throw new Error(buildCitationValidationError(citationValidation));
+    if (citationValidation.invalidRefIds.length > 0 || citationValidation.ambiguousRefIds.length > 0) {
+      console.warn(
+        `[chat] Dropping ${citationValidation.invalidRefIds.length} invalid + ${citationValidation.ambiguousRefIds.length} ambiguous citation ref(s) for thread ${threadId}`
+      );
+    }
+
+    if (citationValidation.missingRequiredCitations) {
+      throw new Error("Assistant response did not include any citation tokens");
+    }
+
+    if (citationValidation.entries.length === 0 && citationValidation.citations.length > 0) {
+      throw new Error("All citation refs in the response are invalid");
     }
 
     const annotationValidation = await validateAnnotationsForPapers(
@@ -230,8 +236,10 @@ export async function POST(
       result.assistantText,
     );
 
-    if (!annotationValidation.isValid) {
-      throw new Error(buildAnnotationValidationError(annotationValidation));
+    if (annotationValidation.invalidAnnotationIds.length > 0) {
+      console.warn(
+        `[chat] Dropping ${annotationValidation.invalidAnnotationIds.length} invalid annotation ref(s) for thread ${threadId}`
+      );
     }
 
     // Finalize the partial message

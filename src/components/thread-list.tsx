@@ -81,7 +81,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
               {thread.paperTitles.length > 0 && (
                 <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground/60">
                   {thread.paperTitles.map((title, i) => (
-                    <span key={i} className="inline-flex min-w-0 max-w-[45%] items-center gap-1">
+                    <span key={i} className={`inline-flex min-w-0 items-center gap-1 ${thread.paperTitles.length > 1 ? "max-w-[45%]" : "max-w-full"}`}>
                       <FileText className="h-3 w-3 shrink-0" />
                       <span className="truncate">{title}</span>
                     </span>

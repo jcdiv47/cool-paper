@@ -34,6 +34,7 @@ export function useConvexChat(): UseConvexChatReturn {
   const [paperIds, setPaperIds] = useState<string[]>([]);
   const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const abortRef = useRef<AbortController | null>(null);
+  const hadPartialRef = useRef(false);
 
   // Convex client for imperative queries
   const convex = useConvex();
@@ -64,16 +65,37 @@ export function useConvexChat(): UseConvexChatReturn {
     model: m.model,
   }));
 
-  // Detect streaming state from partial messages
+  // Detect streaming state from partial messages.
+  // Only turn off streaming after we've seen a partial message get finalized —
+  // otherwise the effect fires prematurely when the user message arrives but
+  // the assistant partial hasn't been created yet.
   useEffect(() => {
+    if (!isStreaming) {
+      hadPartialRef.current = false;
+      return;
+    }
     if (!convexMessages) return;
     const hasPartial = convexMessages.some(
       (m) => m.role === "assistant" && m.isPartial === true
     );
-    if (!hasPartial && isStreaming) {
-      // Streaming ended (partial was finalized)
+    if (hasPartial) {
+      hadPartialRef.current = true;
+      // Once the partial message has visible content, the model has moved
+      // past the thinking phase into content generation.
+      if (isThinking) {
+        const partial = convexMessages.find(
+          (m) => m.role === "assistant" && m.isPartial === true
+        );
+        if (partial && partial.content) {
+          setIsThinking(false);
+        }
+      }
+    }
+    if (!hasPartial && hadPartialRef.current) {
+      // Partial was present before but now finalized
       setIsStreaming(false);
       setIsThinking(false);
+      hadPartialRef.current = false;
     }
   }, [convexMessages, isStreaming]);
 

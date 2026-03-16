@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useQuery } from "convex/react";
-import { Send, Square, MessageCircle, ChevronRight, Brain } from "lucide-react";
+import { Send, Square, MessageCircle, ChevronRight, Brain, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -74,12 +74,8 @@ function ThinkingCard({
     return (
       <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
         <Brain className="h-3.5 w-3.5" />
-        <span>
-          Working
-          <span className="inline-flex w-4">
-            <span className="animate-pulse">...</span>
-          </span>
-        </span>
+        <span>Thinking…</span>
+        <LoaderCircle className="h-3 w-3 animate-spin" />
       </div>
     );
   }
@@ -101,6 +97,9 @@ function ThinkingCard({
         />
         <Brain className="h-3.5 w-3.5" />
         <span>{label}</span>
+        {isActivelyThinking && (
+          <LoaderCircle className="h-3 w-3 animate-spin" />
+        )}
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="mt-2 rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs font-mono text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
@@ -129,6 +128,8 @@ export function ChatView({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userScrolledUp = useRef(false);
   const lastScrollTop = useRef(0);
+  const lastUserMsgRef = useRef<HTMLDivElement>(null);
+  const justSubmittedRef = useRef(false);
 
   // Auto-scroll during streaming, but pause if user scrolls up
   useEffect(() => {
@@ -154,7 +155,15 @@ export function ChatView({
   }, []);
 
   useEffect(() => {
-    if (!userScrolledUp.current && scrollRef.current) {
+    if (userScrolledUp.current) return;
+    if (justSubmittedRef.current && lastUserMsgRef.current && scrollRef.current) {
+      // Scroll so user's message is near the top of the viewport
+      const container = scrollRef.current;
+      const msgEl = lastUserMsgRef.current;
+      container.scrollTop = msgEl.offsetTop - 24;
+      justSubmittedRef.current = false;
+    } else if (scrollRef.current) {
+      // During streaming, keep scrolling to bottom to follow new content
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
@@ -172,6 +181,7 @@ export function ChatView({
     onSendMessage(input.trim());
     setInput("");
     userScrolledUp.current = false;
+    justSubmittedRef.current = true;
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -320,7 +330,7 @@ export function ChatView({
                   msg.role === "assistant" && isLastMessage && isStreaming;
 
                 return (
-                  <div key={i}>
+                  <div key={i} ref={isLastMessage && msg.role === "user" ? lastUserMsgRef : undefined}>
                     {msg.role === "user" ? (
                       <div className="flex justify-end">
                         <div className="max-w-[85%] bg-primary/10 px-4 py-2.5">
@@ -369,6 +379,14 @@ export function ChatView({
                   </div>
                 );
               })}
+              {/* Show thinking indicator while waiting for first assistant partial */}
+              {isStreaming &&
+                messages.length > 0 &&
+                messages.at(-1)?.role === "user" && (
+                  <div className="w-full">
+                    <ThinkingCard isActivelyThinking={true} />
+                  </div>
+                )}
             </div>
           )}
 
