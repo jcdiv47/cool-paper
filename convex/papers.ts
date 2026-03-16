@@ -1,5 +1,76 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+
+async function removePaperArtifacts(
+  ctx: MutationCtx,
+  paperId: Id<"papers">,
+  sanitizedId: string
+) {
+  const notes = await ctx.db
+    .query("notes")
+    .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const note of notes) {
+    const citations = await ctx.db
+      .query("note_citations")
+      .withIndex("by_noteId", (q) => q.eq("noteId", note._id))
+      .collect();
+    for (const citation of citations) {
+      await ctx.db.delete(citation._id);
+    }
+    await ctx.db.delete(note._id);
+  }
+
+  const annotations = await ctx.db
+    .query("annotations")
+    .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const annotation of annotations) {
+    await ctx.db.delete(annotation._id);
+  }
+
+  const messageCitations = await ctx.db
+    .query("message_citations")
+    .withIndex("by_paperId_refId", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const citation of messageCitations) {
+    await ctx.db.delete(citation._id);
+  }
+
+  const chunks = await ctx.db
+    .query("paper_chunks")
+    .withIndex("by_paperId_indexVersion", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const chunk of chunks) {
+    await ctx.db.delete(chunk._id);
+  }
+
+  const indexes = await ctx.db
+    .query("paper_indexes")
+    .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const index of indexes) {
+    await ctx.db.delete(index._id);
+  }
+
+  const jobs = await ctx.db
+    .query("jobs")
+    .withIndex("by_sanitizedPaperId", (q) =>
+      q.eq("sanitizedPaperId", sanitizedId)
+    )
+    .collect();
+  for (const job of jobs) {
+    const events = await ctx.db
+      .query("job_events")
+      .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
+      .collect();
+    for (const event of events) {
+      await ctx.db.delete(event._id);
+    }
+    await ctx.db.delete(job._id);
+  }
+}
 
 export const list = query({
   args: {},
@@ -57,32 +128,7 @@ export const remove = mutation({
     const paper = await ctx.db.get(id);
     if (!paper) return;
 
-    // Cascade delete notes
-    const notes = await ctx.db
-      .query("notes")
-      .withIndex("by_paperId", (q) => q.eq("paperId", id))
-      .collect();
-    for (const note of notes) {
-      await ctx.db.delete(note._id);
-    }
-
-    // Cascade delete jobs and their events
-    const jobs = await ctx.db
-      .query("jobs")
-      .withIndex("by_sanitizedPaperId", (q) =>
-        q.eq("sanitizedPaperId", paper.sanitizedId)
-      )
-      .collect();
-    for (const job of jobs) {
-      const events = await ctx.db
-        .query("job_events")
-        .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
-        .collect();
-      for (const event of events) {
-        await ctx.db.delete(event._id);
-      }
-      await ctx.db.delete(job._id);
-    }
+    await removePaperArtifacts(ctx, id, paper.sanitizedId);
 
     await ctx.db.delete(id);
   },
@@ -97,32 +143,7 @@ export const removeBySanitizedId = mutation({
       .first();
     if (!paper) return;
 
-    // Cascade delete notes
-    const notes = await ctx.db
-      .query("notes")
-      .withIndex("by_paperId", (q) => q.eq("paperId", paper._id))
-      .collect();
-    for (const note of notes) {
-      await ctx.db.delete(note._id);
-    }
-
-    // Cascade delete jobs and their events
-    const jobs = await ctx.db
-      .query("jobs")
-      .withIndex("by_sanitizedPaperId", (q) =>
-        q.eq("sanitizedPaperId", sanitizedId)
-      )
-      .collect();
-    for (const job of jobs) {
-      const events = await ctx.db
-        .query("job_events")
-        .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
-        .collect();
-      for (const event of events) {
-        await ctx.db.delete(event._id);
-      }
-      await ctx.db.delete(job._id);
-    }
+    await removePaperArtifacts(ctx, paper._id, sanitizedId);
 
     await ctx.db.delete(paper._id);
   },

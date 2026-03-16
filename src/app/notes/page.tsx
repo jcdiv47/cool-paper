@@ -51,11 +51,8 @@ export default function NotesListPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header search={search} onSearchChange={setSearch} searchPlaceholder="Search notes...">
-        <span className="text-sm font-medium">Notes</span>
-        <div className="flex-1" />
-      </Header>
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <Header search={search} onSearchChange={setSearch} searchPlaceholder="Search notes..." pageTitle="Notes" />
+      <main className="mx-auto max-w-2xl px-4 py-8 pb-20 sm:px-6 sm:pb-8">
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (

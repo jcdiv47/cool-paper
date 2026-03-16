@@ -1,5 +1,22 @@
 import type { TaskType, TaskConfig } from "./types";
 
+function citationRules() {
+  return `Citation rules:
+- Use only refIds that appear in the provided evidence index JSONL files.
+- Every non-trivial factual claim about a paper must include at least one inline citation token.
+- Citation token format must be exactly [[cite:<refId>]].
+- Do not invent page numbers, bibliography-style citations, or freeform citation text.
+- If the evidence index does not support a claim, say that directly and do not cite it.`;
+}
+
+function annotationRules() {
+  return `Annotation rules:
+- Saved user highlights and notes may be referenced with [[annot:<annotationId>]].
+- Use only annotation ids that appear in the provided saved-annotation lists.
+- Annotation tokens are optional and only for referring to saved user annotations.
+- Do not use annotation tokens as substitutes for evidence citations.`;
+}
+
 export const NOTE_GENERATION_CONFIG: TaskConfig = {
   taskType: "note-generation",
   agentOptions: {
@@ -14,10 +31,17 @@ export const NOTE_GENERATION_CONFIG: TaskConfig = {
 Title: ${ctx.paper.title}
 Authors: ${ctx.paper.authors.join(", ")}
 Abstract: ${ctx.paper.abstract}
+Evidence index: ${ctx.paperEvidencePath}
+${ctx.paperAnnotationsBlock ? `\n${ctx.paperAnnotationsBlock}` : ""}
 
 ${ctx.taskInstruction}
 
-Write your analysis as well-structured markdown. Save it to "${ctx.notesDir}/${ctx.noteFilename}".`,
+${citationRules()}
+${annotationRules()}
+
+Write your analysis as well-structured markdown.
+Use the evidence index as the canonical source for citations.
+Save the note to "${ctx.notesDir}/${ctx.noteFilename}".`,
   displayLabel: "Generate Note",
 };
 
@@ -48,7 +72,9 @@ export const CONVERSATION_CONFIG: TaskConfig = {
           const sanitizedId = p.arxivId.replace(/\//g, "_");
           return `[${i + 1}] "${p.title}" — ${p.authors.slice(0, 3).join(", ")}${p.authors.length > 3 ? " et al." : ""}
     Abstract: ${p.abstract.slice(0, 300)}${p.abstract.length > 300 ? "…" : ""}
-    Source files: papers/${sanitizedId}/`;
+    Source files: papers/${sanitizedId}/
+    Evidence index: ${ctx.paperEvidencePaths?.[i] ?? `papers/${sanitizedId}/evidence-index.jsonl`}
+    ${ctx.paperAnnotationsBlocks?.[i] ?? "Saved annotations: none."}`;
         })
         .join("\n\n");
 
@@ -59,6 +85,8 @@ ${papersBlock}
 
 The paper source files are available in the current working directory under papers/.
 When referencing papers, use their number [1], [2], etc. or title.
+${citationRules()}
+${annotationRules()}
 ${historyBlock}
 ${ctx.taskInstruction}`;
     }
@@ -68,8 +96,12 @@ ${ctx.taskInstruction}`;
 Title: ${ctx.paper.title}
 Authors: ${ctx.paper.authors.join(", ")}
 Abstract: ${ctx.paper.abstract}
+Evidence index: ${ctx.paperEvidencePath}
+${ctx.paperAnnotationsBlock ? `\n${ctx.paperAnnotationsBlock}` : ""}
 
 The paper source files are available in the current working directory.
+${citationRules()}
+${annotationRules()}
 ${historyBlock}
 ${ctx.taskInstruction}`;
   },

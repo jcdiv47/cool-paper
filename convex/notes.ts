@@ -159,6 +159,13 @@ export const remove = mutation({
       .collect();
     const match = notes.find((n) => n.filename === filename);
     if (match) {
+      const citations = await ctx.db
+        .query("note_citations")
+        .withIndex("by_noteId", (q) => q.eq("noteId", match._id))
+        .collect();
+      for (const citation of citations) {
+        await ctx.db.delete(citation._id);
+      }
       await ctx.db.delete(match._id);
     }
   },

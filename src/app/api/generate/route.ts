@@ -3,11 +3,18 @@ import { getPaper } from "@/lib/papers";
 import { sanitizeArxivId } from "@/lib/constants";
 import { setNoteMeta, getNote } from "@/lib/notes";
 import {
+  buildAnnotationPromptBlock,
+  buildAnnotationValidationError,
+  validateAnnotationsForPapers,
+} from "@/lib/annotation-links";
+import {
   resolveAgentQuery,
   executeAgentQuery,
   extractTextFromMessage,
 } from "@/lib/agent";
+import { buildCitationValidationError, validateCitationsForPapers } from "@/lib/citation-validation";
 import { getConvexClient } from "@/lib/convex-client";
+import { ensurePaperEvidenceIndex } from "@/lib/evidence-index";
 import { api } from "../../../../convex/_generated/api";
 import type { GenerateRequest } from "@/types";
 
@@ -50,8 +57,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paper not found" }, { status: 404 });
   }
 
+  await ensurePaperEvidenceIndex(sanitizedId, convex);
+  const paperRecord = await convex.query(api.papers.get, { sanitizedId });
+  if (!paperRecord) {
+    return NextResponse.json({ error: "Paper not found in Convex" }, { status: 404 });
+  }
+  const paperAnnotations = await convex.query(api.annotations.listByPaper, {
+    paperId: paperRecord._id,
+  });
+
   const resolved = resolveAgentQuery({
     paper,
+    paperAnnotationsBlock: buildAnnotationPromptBlock(
+      paperAnnotations.map((annotation) => ({
+        annotationId: String(annotation._id),
+        page: annotation.page,
+        kind: annotation.kind,
+        comment: annotation.comment,
+        exact: annotation.exact,
+      }))
+    ),
     promptInput: prompt,
     noteFilename,
     taskType,
@@ -111,15 +136,16 @@ export async function POST(request: Request) {
         }
 
         if (message.type === "result") {
-          if (message.subtype === "success") {
-            await pushEvent("stdout", {
-              text: `\n\n[Completed in ${(message.duration_ms / 1000).toFixed(1)}s, cost: $${message.total_cost_usd.toFixed(4)}]\n`,
-            });
-            setNoteMeta(sanitizedId, noteFilename, {
-              model: resolved.options.model,
-            }).catch(() => {});
+          const costLine = `\n\n[Completed in ${(message.duration_ms / 1000).toFixed(1)}s, cost: $${message.total_cost_usd.toFixed(4)}]\n`;
+          await pushEvent("stdout", { text: costLine });
 
-            // Sync the generated note to Convex before marking complete
+          setNoteMeta(sanitizedId, noteFilename, {
+            model: resolved.options.model,
+          }).catch(() => {});
+
+          // Attempt to sync the note to Convex regardless of agent exit status —
+          // the agent may have written the file before hitting max turns or erroring.
+          try {
             await syncNoteToConvex(sanitizedId, noteFilename, resolved.options.model);
 
             await pushEvent("done", { exitCode: 0 });
@@ -127,8 +153,16 @@ export async function POST(request: Request) {
               id: convexJobId,
               status: "completed",
             });
-          } else {
-            const errorMsg = `Agent error: ${"error" in message ? message.error : "unknown"}`;
+          } catch (syncErr) {
+            // Sync failed — report the original agent error (if any) plus sync failure
+            const agentErrors = "errors" in message && Array.isArray(message.errors)
+              ? (message.errors as string[]).join("; ")
+              : null;
+            const syncErrMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
+            const errorMsg = message.subtype !== "success"
+              ? `Agent ${message.subtype}: ${agentErrors ?? "unknown"}. Sync also failed: ${syncErrMsg}`
+              : `Sync failed: ${syncErrMsg}`;
+
             await pushEvent("error", { message: errorMsg });
             await pushEvent("done", { exitCode: 1 });
             await convex.mutation(api.jobs.complete, {
@@ -172,16 +206,44 @@ async function syncNoteToConvex(
   }
 
   const convex = getConvexClient();
+  const ensuredIndex = await ensurePaperEvidenceIndex(sanitizedId, convex);
 
   const paper = await convex.query(api.papers.get, { sanitizedId });
   if (!paper) {
     throw new Error(`Paper ${sanitizedId} not found in Convex`);
   }
 
+  const citationValidation = await validateCitationsForPapers(
+    convex,
+    [
+      {
+        paperId: paper._id,
+        activeIndexVersion:
+          paper.activeIndexVersion ?? ensuredIndex.indexVersion,
+      },
+    ],
+    content,
+    { requireAtLeastOneCitation: true }
+  );
+
+  if (!citationValidation.isValid) {
+    throw new Error(buildCitationValidationError(citationValidation));
+  }
+
+  const annotationValidation = await validateAnnotationsForPapers(
+    convex,
+    [paper._id],
+    content,
+  );
+
+  if (!annotationValidation.isValid) {
+    throw new Error(buildAnnotationValidationError(annotationValidation));
+  }
+
   const title = noteFilename.replace(/\.md$/, "").replace(/[-_]/g, " ");
   const now = new Date().toISOString();
 
-  await convex.mutation(api.notes.upsert, {
+  const noteId = await convex.mutation(api.notes.upsert, {
     paperId: paper._id,
     sanitizedPaperId: sanitizedId,
     filename: noteFilename,
@@ -190,5 +252,10 @@ async function syncNoteToConvex(
     model,
     createdAt: now,
     modifiedAt: now,
+  });
+
+  await convex.mutation(api.noteCitations.replaceForNote, {
+    noteId,
+    entries: citationValidation.entries,
   });
 }

@@ -11,6 +11,7 @@ export default defineSchema({
     published: v.string(),
     categories: v.array(v.string()),
     addedAt: v.string(),
+    activeIndexVersion: v.optional(v.number()),
   })
     .index("by_arxivId", ["arxivId"])
     .index("by_sanitizedId", ["sanitizedId"])
@@ -87,4 +88,76 @@ export default defineSchema({
   })
     .index("by_jobId", ["jobId"])
     .index("by_jobId_sequence", ["jobId", "sequenceNumber"]),
+
+  paper_indexes: defineTable({
+    paperId: v.id("papers"),
+    version: v.number(),
+    extractorVersion: v.string(),
+    createdAt: v.string(),
+  })
+    .index("by_paperId", ["paperId"])
+    .index("by_paperId_version", ["paperId", "version"]),
+
+  paper_chunks: defineTable({
+    paperId: v.id("papers"),
+    indexVersion: v.number(),
+    refId: v.string(),
+    page: v.number(),
+    order: v.number(),
+    section: v.optional(v.string()),
+    text: v.string(),
+    normText: v.string(),
+    prefix: v.optional(v.string()),
+    suffix: v.optional(v.string()),
+    start: v.optional(v.number()),
+    end: v.optional(v.number()),
+  })
+    .index("by_paperId_indexVersion", ["paperId", "indexVersion"])
+    .index("by_paperId_indexVersion_refId", ["paperId", "indexVersion", "refId"])
+    .index("by_paperId_page", ["paperId", "page"]),
+
+  note_citations: defineTable({
+    noteId: v.id("notes"),
+    paperId: v.id("papers"),
+    indexVersion: v.number(),
+    refId: v.string(),
+    occurrence: v.number(),
+    createdAt: v.string(),
+  })
+    .index("by_noteId", ["noteId"])
+    .index("by_noteId_occurrence", ["noteId", "occurrence"])
+    .index("by_paperId_refId", ["paperId", "refId"]),
+
+  message_citations: defineTable({
+    messageId: v.id("messages"),
+    paperId: v.id("papers"),
+    indexVersion: v.number(),
+    refId: v.string(),
+    occurrence: v.number(),
+    createdAt: v.string(),
+  })
+    .index("by_messageId", ["messageId"])
+    .index("by_messageId_occurrence", ["messageId", "occurrence"])
+    .index("by_paperId_refId", ["paperId", "refId"]),
+
+  annotations: defineTable({
+    paperId: v.id("papers"),
+    indexVersion: v.number(),
+    kind: v.union(v.literal("highlight"), v.literal("note")),
+    authorType: v.union(v.literal("user"), v.literal("agent")),
+    color: v.optional(v.string()),
+    comment: v.optional(v.string()),
+    chunkRefId: v.optional(v.string()),
+    page: v.number(),
+    exact: v.string(),
+    prefix: v.optional(v.string()),
+    suffix: v.optional(v.string()),
+    start: v.optional(v.number()),
+    end: v.optional(v.number()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_paperId", ["paperId"])
+    .index("by_paperId_indexVersion", ["paperId", "indexVersion"])
+    .index("by_paperId_chunkRefId", ["paperId", "chunkRefId"]),
 });

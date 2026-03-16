@@ -1,4 +1,5 @@
 import { CACHE_BASE_DIR } from "../constants";
+import { evidenceIndexRelativePath } from "../evidence-index";
 import { PROMPT_TEMPLATES } from "../quick-prompts";
 import { getTaskConfig } from "./task-configs";
 import type { PaperMetadata, ThreadMessage } from "@/types";
@@ -8,6 +9,8 @@ export interface ResolveAgentQueryParams {
   paper: PaperMetadata;
   /** Multiple papers for cross-paper chat */
   papers?: PaperMetadata[];
+  paperAnnotationsBlock?: string;
+  paperAnnotationsBlocks?: string[];
   promptInput: string;
   noteFilename: string;
   taskType?: TaskType;
@@ -19,6 +22,8 @@ export function resolveAgentQuery(params: ResolveAgentQueryParams): ResolvedAgen
   const {
     paper,
     papers,
+    paperAnnotationsBlock,
+    paperAnnotationsBlocks,
     promptInput,
     noteFilename,
     taskType = "note-generation",
@@ -31,9 +36,22 @@ export function resolveAgentQuery(params: ResolveAgentQueryParams): ResolvedAgen
   const cwd = CACHE_BASE_DIR;
   const notesDir = `${cwd}/papers/${sanitizedId}/notes`;
   const taskInstruction = PROMPT_TEMPLATES[promptInput] || promptInput;
+  const paperEvidencePath = evidenceIndexRelativePath(sanitizedId);
+  const paperEvidencePaths = papers?.map((p) =>
+    evidenceIndexRelativePath(p.arxivId.replace(/\//g, "_"))
+  );
 
   const context: PromptContext = {
-    paper, papers, promptInput, taskInstruction, notesDir, noteFilename,
+    paper,
+    papers,
+    paperEvidencePath,
+    paperEvidencePaths,
+    paperAnnotationsBlock,
+    paperAnnotationsBlocks,
+    promptInput,
+    taskInstruction,
+    notesDir,
+    noteFilename,
     conversationHistory,
   };
 

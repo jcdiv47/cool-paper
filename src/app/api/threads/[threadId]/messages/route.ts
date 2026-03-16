@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { getPaper } from "@/lib/papers";
 import {
+  buildAnnotationPromptBlock,
+  buildAnnotationValidationError,
+  validateAnnotationsForPapers,
+} from "@/lib/annotation-links";
+import {
   resolveAgentQuery,
   executeAgentQuery,
   extractTextDelta,
   extractThinkingDelta,
 } from "@/lib/agent";
+import {
+  buildCitationValidationError,
+  validateCitationsForPapers,
+} from "@/lib/citation-validation";
 import { getConvexClient } from "@/lib/convex-client";
+import { ensurePaperEvidenceIndex } from "@/lib/evidence-index";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
 import type { ResolvedAgentQuery } from "@/lib/agent";
@@ -46,9 +56,32 @@ export async function POST(
 
   // Load all papers for this thread
   const papers: PaperMetadata[] = [];
+  const citationPapers: { paperId: Id<"papers">; activeIndexVersion?: number }[] = [];
+  const paperAnnotationsBlocks: string[] = [];
   for (const pid of thread.paperIds) {
+    const ensuredIndex = await ensurePaperEvidenceIndex(pid, convex);
     const paper = await getPaper(pid);
-    if (paper) papers.push(paper);
+    const annotations = await convex.query(api.annotations.listByPaper, {
+      paperId: ensuredIndex.paperId,
+    });
+    if (paper) {
+      papers.push(paper);
+      paperAnnotationsBlocks.push(
+        buildAnnotationPromptBlock(
+          annotations.map((annotation) => ({
+            annotationId: String(annotation._id),
+            page: annotation.page,
+            kind: annotation.kind,
+            comment: annotation.comment,
+            exact: annotation.exact,
+          }))
+        )
+      );
+    }
+    citationPapers.push({
+      paperId: ensuredIndex.paperId,
+      activeIndexVersion: ensuredIndex.indexVersion,
+    });
   }
 
   if (papers.length === 0) {
@@ -81,6 +114,9 @@ export async function POST(
   const resolved = resolveAgentQuery({
     paper: papers[0]!,
     papers: papers.length > 1 ? papers : undefined,
+    paperAnnotationsBlock: paperAnnotationsBlocks[0],
+    paperAnnotationsBlocks:
+      papers.length > 1 ? paperAnnotationsBlocks : undefined,
     promptInput: message,
     noteFilename: "",
     taskType: "conversation",
@@ -177,14 +213,40 @@ export async function POST(
       }
     }
 
+    const citationValidation = await validateCitationsForPapers(
+      convex,
+      citationPapers,
+      result.assistantText,
+      { requireAtLeastOneCitation: true }
+    );
+
+    if (!citationValidation.isValid) {
+      throw new Error(buildCitationValidationError(citationValidation));
+    }
+
+    const annotationValidation = await validateAnnotationsForPapers(
+      convex,
+      citationPapers.map((paper) => paper.paperId),
+      result.assistantText,
+    );
+
+    if (!annotationValidation.isValid) {
+      throw new Error(buildAnnotationValidationError(annotationValidation));
+    }
+
     // Finalize the partial message
     if (result.assistantText) {
-      await convex.mutation(api.messages.finalizePartial, {
+      const messageId = await convex.mutation(api.messages.finalizePartial, {
         threadId: threadId as Id<"threads">,
         content: result.assistantText,
         thinking: result.thinkingText || undefined,
         model: resolved.options.model,
         timestamp: new Date().toISOString(),
+      });
+
+      await convex.mutation(api.messageCitations.replaceForMessage, {
+        messageId,
+        entries: citationValidation.entries,
       });
     }
 

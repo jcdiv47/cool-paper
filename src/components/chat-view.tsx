@@ -1,12 +1,7 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeHighlight from "rehype-highlight";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { useQuery } from "convex/react";
 import { Send, Square, MessageCircle, ChevronRight, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +18,14 @@ import {
 } from "@/components/ui/collapsible";
 import { MODEL_OPTIONS } from "@/lib/models";
 import { PaperCardRow } from "@/components/paper-card-row";
+import {
+  CitationMarkdown,
+  type AnnotationTarget,
+  type CitationTarget,
+} from "@/components/citation-markdown";
+import { parseAnnotationTokens } from "@/lib/annotation-links";
+import { parseCitationTokens } from "@/lib/citations";
+import { api } from "../../convex/_generated/api";
 import type { ThreadMessage, PaperMetadata } from "@/types";
 
 interface ChatViewProps {
@@ -65,13 +68,6 @@ function ThinkingCard({
   // Auto behavior: expand while actively thinking with content, collapse when done
   const autoOpen = isActivelyThinking && !!thinking;
   const isOpen = manualOpen ?? autoOpen;
-
-  // Reset manual override when a new thinking session starts
-  useEffect(() => {
-    if (isActivelyThinking) {
-      setManualOpen(null);
-    }
-  }, [isActivelyThinking]);
 
   // Working state: no thinking content yet, just show activity indicator
   if (isActivelyThinking && !thinking) {
@@ -190,6 +186,79 @@ export function ChatView({
   }
 
   const isMultiPaper = papers && papers.length > 1;
+  const citationRefIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          messages.flatMap((msg) =>
+            parseCitationTokens(msg.content).map((citation) => citation.refId)
+          )
+        ),
+      ],
+    [messages]
+  );
+  const annotationIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          messages.flatMap((msg) =>
+            parseAnnotationTokens(msg.content).map(
+              (annotation) => annotation.annotationId
+            )
+          )
+        ),
+      ],
+    [messages]
+  );
+  const citationTargetsResult = useQuery(
+    api.paperChunks.resolveAcrossSanitizedIds,
+    citationRefIds.length > 0 && papers && papers.length > 0
+      ? {
+          sanitizedIds: papers.map((paper) => paper.arxivId.replace(/\//g, "_")),
+          refIds: citationRefIds,
+        }
+      : "skip"
+  );
+  const annotationTargetsResult = useQuery(
+    api.annotations.resolveAcrossSanitizedIds,
+    annotationIds.length > 0 && papers && papers.length > 0
+      ? {
+          sanitizedIds: papers.map((paper) => paper.arxivId.replace(/\//g, "_")),
+          annotationIds,
+        }
+      : "skip"
+  );
+  const citationTargets = useMemo<Record<string, CitationTarget>>(
+    () =>
+      Object.fromEntries(
+        (citationTargetsResult ?? []).map((chunk) => [
+          chunk.refId,
+          {
+            refId: chunk.refId,
+            page: chunk.page,
+            sanitizedId: chunk.sanitizedId,
+            section: chunk.section,
+          },
+        ])
+      ),
+    [citationTargetsResult]
+  );
+  const annotationTargets = useMemo<Record<string, AnnotationTarget>>(
+    () =>
+      Object.fromEntries(
+        (annotationTargetsResult ?? []).map((annotation) => [
+          annotation.annotationId,
+          {
+            annotationId: annotation.annotationId,
+            page: annotation.page,
+            sanitizedId: annotation.sanitizedId,
+            kind: annotation.kind,
+            comment: annotation.comment,
+          },
+        ])
+      ),
+    [annotationTargetsResult]
+  );
   const suggestions = isMultiPaper ? MULTI_SUGGESTIONS : SINGLE_SUGGESTIONS;
   const placeholderText = isMultiPaper
     ? "Ask about these papers…"
@@ -279,12 +348,12 @@ export function ChatView({
                         ) : null}
                         {msg.content ? (
                           <article className="prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif">
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm, remarkMath]}
-                              rehypePlugins={[rehypeHighlight, rehypeKatex]}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
+                            <CitationMarkdown
+                              content={msg.content}
+                              targets={citationTargets}
+                              annotationTargets={annotationTargets}
+                              showPaperLabel={Boolean(isMultiPaper)}
+                            />
                           </article>
                         ) : isStreaming && isLastMessage && !isThinking ? (
                           <span className="inline-block h-4 w-1.5 animate-pulse bg-foreground/60 rounded-sm" />

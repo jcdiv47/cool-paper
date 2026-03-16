@@ -106,7 +106,7 @@ export default function Home() {
           </kbd>
         </Button>
       </Header>
-      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <main className="mx-auto max-w-7xl px-4 py-10 pb-20 sm:px-6 sm:pb-10">
         {loading ? (
           <div className="space-y-8">
             <div className="space-y-3">

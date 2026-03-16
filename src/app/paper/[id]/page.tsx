@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, use } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -12,9 +12,11 @@ import { GenerateNoteDialog } from "@/components/generate-note-dialog";
 import { useConvexGenerateJob } from "@/hooks/use-convex-generate-job";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, BookOpen, AlignLeft, MessageCircle, PenLine } from "lucide-react";
+import { FileText, BookOpen, AlignLeft, MessageCircle, PenLine, Columns2 } from "lucide-react";
 import { Toaster } from "sonner";
 import type { PaperMetadata, NoteFile } from "@/types";
+
+type View = "summary" | "pdf" | "note" | "split";
 
 function PdfSkeleton() {
   return <div className="flex h-full items-center justify-center bg-muted/20 animate-pulse" />;
@@ -40,6 +42,65 @@ const LazyNoteViewer = dynamic(
   { ssr: false, loading: () => <NoteSkeleton /> }
 );
 
+function ViewSwitcher({
+  view,
+  hasNotes,
+  onSwitch,
+  onNoteClick,
+}: {
+  view: View;
+  hasNotes: boolean;
+  onSwitch: (v: View) => void;
+  onNoteClick: () => void;
+}) {
+  const activeClass = "bg-background text-foreground shadow-sm";
+  const inactiveClass = "text-muted-foreground hover:text-foreground";
+
+  return (
+    <div className="flex items-center rounded-lg border border-border bg-secondary/60 p-0.5">
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-7 gap-1.5 text-xs transition-all ${view === "summary" ? activeClass : inactiveClass}`}
+        onClick={() => onSwitch("summary")}
+      >
+        <AlignLeft className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Summary</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-7 gap-1.5 text-xs transition-all ${view === "pdf" ? activeClass : inactiveClass}`}
+        onClick={() => onSwitch("pdf")}
+      >
+        <BookOpen className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">PDF</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-7 gap-1.5 text-xs transition-all ${(view === "note" || view === "split") ? activeClass : inactiveClass}`}
+        onClick={onNoteClick}
+      >
+        <FileText className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Note</span>
+      </Button>
+      {hasNotes && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-7 gap-1.5 text-xs transition-all ${view === "split" ? activeClass : inactiveClass}`}
+          onClick={() => onSwitch(view === "split" ? "note" : "split")}
+          title="Split view: Note + PDF side by side"
+        >
+          <Columns2 className="h-3.5 w-3.5" />
+          <span className="hidden lg:inline">Split</span>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function PaperPage({
   params,
 }: {
@@ -47,11 +108,12 @@ export default function PaperPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [generateOpen, setGenerateOpen] = useState(false);
   const [notesKey, setNotesKey] = useState(0);
   const [selectedNote, setSelectedNote] = useState<string | null>(null);
-  const [view, setView] = useState<"summary" | "pdf" | "note">(
+  const [view, setView] = useState<View>(
     searchParams.get("tab") === "notes"
       ? "note"
       : searchParams.get("tab") === "pdf"
@@ -59,6 +121,7 @@ export default function PaperPage({
         : "summary"
   );
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const noteScrollTopRef = useRef(0);
 
   // Notes from Convex (realtime)
   const convexNotes = useQuery(api.notes.listByPaper, { sanitizedPaperId: id });
@@ -90,15 +153,19 @@ export default function PaperPage({
   });
 
   // Mark tab as visited when switching
-  const switchView = useCallback((v: "summary" | "pdf" | "note") => {
+  const switchView = useCallback((v: View) => {
+    if (v === "split" && !selectedNote && notes.length > 0) {
+      setSelectedNote(notes[0]!.filename);
+    }
     setVisitedTabs((prev) => {
-      if (prev.has(v)) return prev;
+      const needed = v === "split" ? ["note", "pdf"] : [v];
+      if (needed.every((t) => prev.has(t))) return prev;
       const next = new Set(prev);
-      next.add(v);
+      for (const t of needed) next.add(t);
       return next;
     });
     setView(v);
-  }, []);
+  }, [selectedNote, notes]);
 
   const refreshNotes = useCallback(() => {
     setNotesKey((k) => k + 1);
@@ -137,10 +204,35 @@ export default function PaperPage({
     router.push(`/chat/new?paperIds=${id}`);
   }
 
+  function handleNoteClick() {
+    if (!selectedNote && notes.length > 0) {
+      setSelectedNote(notes[0]!.filename);
+    }
+    switchView("note");
+  }
+
+  // When a citation/annotation link is clicked in the note, enter split view
+  // and update URL params so the PdfViewer focuses the target.
+  const handleCitationNavigate = useCallback(
+    (href: string) => {
+      const url = new URL(href, window.location.origin);
+      const newParams = new URLSearchParams(searchParams.toString());
+      for (const key of ["cite", "annotation", "page"]) {
+        const val = url.searchParams.get(key);
+        if (val) newParams.set(key, val);
+        else newParams.delete(key);
+      }
+      newParams.delete("tab");
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+      switchView("split");
+    },
+    [pathname, router, searchParams, switchView],
+  );
+
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <Header>
+        <Header fullWidth breadcrumbs={[{ label: "Papers", href: "/paper" }, { label: "..." }]}>
           <Skeleton className="h-5 w-48" />
         </Header>
         <div className="flex flex-1">
@@ -159,49 +251,29 @@ export default function PaperPage({
 
   if (!paper) return null;
 
+  const viewSwitcher = (
+    <ViewSwitcher
+      view={view}
+      hasNotes={notes.length > 0}
+      onSwitch={switchView}
+      onNoteClick={handleNoteClick}
+    />
+  );
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <Toaster richColors position="bottom-right" />
-      <Header fullWidth>
-        <p className="min-w-0 max-w-[30vw] truncate text-xs text-muted-foreground sm:max-w-xs sm:text-sm md:max-w-sm lg:max-w-md">
-          {paper.title}
-        </p>
-        <div className="flex-1" />
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="flex items-center rounded-lg border border-border bg-secondary p-0.5">
-            <Button
-              variant={view === "summary" ? "secondary" : "ghost"}
-              size="sm"
-              className={`h-7 gap-1.5 text-xs transition-all ${view === "summary" ? "shadow-sm" : ""}`}
-              onClick={() => switchView("summary")}
-            >
-              <AlignLeft className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Summary</span>
-            </Button>
-            <Button
-              variant={view === "pdf" ? "secondary" : "ghost"}
-              size="sm"
-              className={`h-7 gap-1.5 text-xs transition-all ${view === "pdf" ? "shadow-sm" : ""}`}
-              onClick={() => switchView("pdf")}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">PDF</span>
-            </Button>
-            <Button
-              variant={view === "note" ? "secondary" : "ghost"}
-              size="sm"
-              className={`h-7 gap-1.5 text-xs transition-all ${view === "note" ? "shadow-sm" : ""}`}
-              onClick={() => {
-                if (!selectedNote && notes.length > 0) {
-                  setSelectedNote(notes[0]!.filename);
-                }
-                switchView("note");
-              }}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Note</span>
-            </Button>
-          </div>
+      <Header
+        fullWidth
+        breadcrumbs={[
+          { label: "Papers", href: "/paper" },
+          { label: paper.title },
+        ]}
+        secondaryToolbar={viewSwitcher}
+      >
+        {/* Desktop: view switcher + chat button inline */}
+        <div className="hidden shrink-0 items-center gap-2 md:flex">
+          {viewSwitcher}
           <Button
             variant="ghost"
             size="sm"
@@ -209,14 +281,40 @@ export default function PaperPage({
             onClick={handleChatAboutPaper}
           >
             <MessageCircle className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Chat</span>
+            Chat
           </Button>
         </div>
+        {/* Mobile: only chat button in main bar */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs md:hidden"
+          onClick={handleChatAboutPaper}
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+        </Button>
       </Header>
 
       <div className="flex flex-1 overflow-hidden">
+        {/* Split view: Note (left) + PDF (right) */}
+        {view === "split" && selectedNote && (
+          <div className="flex h-full min-h-0 flex-1">
+            <div className="h-full min-w-0 flex-[4] border-r border-border/40">
+              <LazyNoteViewer
+                paperId={id}
+                filename={selectedNote}
+                onCitationNavigate={handleCitationNavigate}
+                scrollTopRef={noteScrollTopRef}
+              />
+            </div>
+            <div className="h-full min-w-0 flex-[6]">
+              <LazyPdfViewer paperId={id} />
+            </div>
+          </div>
+        )}
+
         {/* Main content area: views stacked with visibility toggling */}
-        <div className="relative min-h-0 flex-1">
+        <div className={`relative min-h-0 flex-1 ${view === "split" ? "hidden" : ""}`}>
           <div className={view === "summary" ? "h-full" : "invisible absolute inset-0"}>
             <SummaryView paper={paper} />
           </div>
@@ -231,6 +329,8 @@ export default function PaperPage({
                 <LazyNoteViewer
                   paperId={id}
                   filename={selectedNote}
+                  onCitationNavigate={handleCitationNavigate}
+                  scrollTopRef={noteScrollTopRef}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-6 text-center">
@@ -310,7 +410,7 @@ export default function PaperPage({
         <Button
           variant="outline"
           size="icon-lg"
-          className={`fixed bottom-6 right-6 z-30 transition-opacity md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+          className={`fixed bottom-20 right-6 z-30 transition-opacity sm:bottom-6 md:hidden ${mobileSidebar ? "opacity-0 pointer-events-none" : "opacity-100"}`}
           onClick={() => setMobileSidebar(true)}
           aria-label="Open sidebar"
         >

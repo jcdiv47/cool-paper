@@ -79,6 +79,13 @@ export const remove = mutation({
       .withIndex("by_threadId", (q) => q.eq("threadId", id))
       .collect();
     for (const msg of messages) {
+      const citations = await ctx.db
+        .query("message_citations")
+        .withIndex("by_messageId", (q) => q.eq("messageId", msg._id))
+        .collect();
+      for (const citation of citations) {
+        await ctx.db.delete(citation._id);
+      }
       await ctx.db.delete(msg._id);
     }
     await ctx.db.delete(id);

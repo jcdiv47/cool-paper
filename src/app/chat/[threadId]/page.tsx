@@ -8,7 +8,6 @@ import { api } from "../../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { PaperPickerDialog } from "@/components/paper-picker-dialog";
 import { useConvexChat } from "@/hooks/use-convex-chat";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster, toast } from "sonner";
 import type { PaperMetadata } from "@/types";
@@ -99,10 +98,15 @@ export default function ActiveChatPage({
     chat.removePaper(paperId);
   }
 
+  // Derive thread title from chat state
+  const threadTitle = chat.messages.length > 0
+    ? chat.messages[0]?.content?.slice(0, 40) || "New Chat"
+    : "New Chat";
+
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background">
-        <Header fullWidth>
+        <Header fullWidth breadcrumbs={[{ label: "Chats", href: "/chat" }, { label: "..." }]}>
           <Skeleton className="h-5 w-48" />
         </Header>
         <div className="flex-1 animate-pulse bg-muted/20" />
@@ -113,17 +117,13 @@ export default function ActiveChatPage({
   return (
     <div className="flex h-screen flex-col bg-background">
       <Toaster richColors position="bottom-right" />
-      <Header fullWidth>
-        <Button
-          variant="link"
-          size="sm"
-          onClick={() => router.push("/chat")}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          &larr; Chats
-        </Button>
-        <div className="flex-1" />
-      </Header>
+      <Header
+        fullWidth
+        breadcrumbs={[
+          { label: "Chats", href: "/chat" },
+          { label: threadTitle },
+        ]}
+      />
       <div className="min-h-0 flex-1">
         <LazyChatView
           messages={chat.messages}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createPaper } from "@/lib/papers";
 import { extractArxivId, sanitizeArxivId } from "@/lib/constants";
 import { getConvexClient } from "@/lib/convex-client";
+import { ensurePaperEvidenceIndex } from "@/lib/evidence-index";
 import { api } from "../../../../convex/_generated/api";
 
 export async function GET() {
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
       categories: paper.categories,
       addedAt: paper.addedAt,
     });
+
+    await ensurePaperEvidenceIndex(sanitizeArxivId(paper.arxivId), convex);
 
     return NextResponse.json(paper);
   } catch (e) {

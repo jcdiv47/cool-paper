@@ -46,9 +46,7 @@ export default function ChatInboxPage() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="bottom-right" />
-      <Header>
-        <span className="text-sm font-medium">Chats</span>
-        <div className="flex-1" />
+      <Header pageTitle="Chats">
         <Button
           size="sm"
           className="gap-1.5"
@@ -58,7 +56,7 @@ export default function ChatInboxPage() {
           New Chat
         </Button>
       </Header>
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-2xl px-4 py-8 pb-20 sm:px-6 sm:pb-8">
         <ThreadList
           threads={threads}
           loading={loading}

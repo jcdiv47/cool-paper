@@ -1,15 +1,15 @@
 "use client";
 
-import { FileText, Search, BookOpen, NotebookPen, MessageCircle } from "lucide-react";
+import { FileText, Search, ChevronRight, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DESKTOP_NAV } from "@/lib/nav";
 
-const NAV_ITEMS = [
-  { href: "/paper", label: "Papers", icon: BookOpen },
-  { href: "/notes", label: "Notes", icon: NotebookPen },
-  { href: "/chat", label: "Chats", icon: MessageCircle },
-];
+export interface Breadcrumb {
+  label: string;
+  href?: string;
+}
 
 export function Header({
   children,
@@ -17,14 +17,23 @@ export function Header({
   search,
   onSearchChange,
   searchPlaceholder = "Search papers...",
+  pageTitle,
+  breadcrumbs,
+  secondaryToolbar,
 }: {
   children?: React.ReactNode;
   fullWidth?: boolean;
   search?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  pageTitle?: string;
+  breadcrumbs?: Breadcrumb[];
+  secondaryToolbar?: React.ReactNode;
 }) {
   const pathname = usePathname();
+
+  // Find the first breadcrumb with an href (used as back target on mobile)
+  const backCrumb = breadcrumbs?.find((b) => b.href);
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-2xl">
@@ -38,13 +47,13 @@ export function Header({
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
             <FileText className="h-3.5 w-3.5 text-primary-foreground" />
           </div>
-          <span className="font-serif text-[15px] font-semibold tracking-tight">
+          <span className="hidden font-serif text-[15px] font-semibold tracking-tight sm:inline">
             Cool Paper
           </span>
         </Link>
 
         <nav className="hidden items-center gap-0.5 sm:flex">
-          {NAV_ITEMS.map((item) => {
+          {DESKTOP_NAV.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
               <Link
@@ -63,6 +72,49 @@ export function Header({
           })}
         </nav>
 
+        {/* Page title (list pages) */}
+        {pageTitle && (
+          <span className="text-sm font-medium sm:hidden">{pageTitle}</span>
+        )}
+
+        {/* Breadcrumbs — desktop: full trail, mobile: back arrow + parent */}
+        {breadcrumbs && breadcrumbs.length > 0 && (
+          <>
+            {/* Mobile: back arrow + parent name */}
+            {backCrumb && (
+              <Link
+                href={backCrumb.href!}
+                className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground sm:hidden"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                {backCrumb.label}
+              </Link>
+            )}
+            {/* Desktop: full breadcrumb trail */}
+            <div className="hidden items-center gap-1 text-xs sm:flex">
+              {breadcrumbs.map((crumb, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  {i > 0 && (
+                    <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
+                  )}
+                  {crumb.href ? (
+                    <Link
+                      href={crumb.href}
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    <span className="max-w-[30vw] truncate text-muted-foreground/60">
+                      {crumb.label}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+
         {onSearchChange !== undefined && (
           <div className="relative w-full max-w-xs">
             <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
@@ -78,7 +130,13 @@ export function Header({
           {children}
         </div>
       </div>
-      {/* Gradient border */}
+      {/* Secondary toolbar (mobile only) */}
+      {secondaryToolbar && (
+        <div className="flex h-10 items-center gap-2 px-4 sm:px-6 md:hidden">
+          {secondaryToolbar}
+        </div>
+      )}
+      {/* Border line */}
       <div className="h-px bg-border" />
     </header>
   );

@@ -27,6 +27,10 @@ export interface PromptContext {
   paper: PaperMetadata;
   /** Multiple papers for cross-paper chat */
   papers?: PaperMetadata[];
+  paperEvidencePath: string;
+  paperEvidencePaths?: string[];
+  paperAnnotationsBlock?: string;
+  paperAnnotationsBlocks?: string[];
   promptInput: string;
   /** Resolved from PROMPT_TEMPLATES if promptInput is a key, otherwise equals promptInput */
   taskInstruction: string;

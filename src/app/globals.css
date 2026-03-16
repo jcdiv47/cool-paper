@@ -175,6 +175,56 @@
   overflow-y: hidden;
 }
 
+.citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0.12rem;
+  padding: 0.05rem 0.38rem;
+  border: 1px solid color-mix(in oklch, var(--primary) 24%, var(--border));
+  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  color: var(--primary);
+  font-size: 0.78em;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.citation-chip:hover {
+  background: color-mix(in oklch, var(--primary) 16%, transparent);
+  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+}
+.citation-chip-missing {
+  border-style: dashed;
+  color: var(--muted-foreground);
+}
+.annotation-chip {
+  border-color: color-mix(in oklch, var(--chart-3) 28%, var(--border));
+  background: color-mix(in oklch, var(--chart-3) 10%, transparent);
+  color: color-mix(in oklch, var(--chart-3) 70%, var(--foreground));
+}
+.annotation-chip:hover {
+  background: color-mix(in oklch, var(--chart-3) 16%, transparent);
+  border-color: color-mix(in oklch, var(--chart-3) 42%, var(--border));
+}
+.annotation-chip-missing {
+  border-style: dashed;
+  color: var(--muted-foreground);
+}
+
+/* ─── PDF text-layer: keep selection readable without font mismatch ─── */
+.react-pdf__Page__textContent.textLayer span {
+  color: transparent !important;
+}
+.react-pdf__Page__textContent.textLayer span::selection {
+  color: transparent !important;
+  background: rgba(0, 100, 255, 0.3);
+}
+.react-pdf__Page__textContent.textLayer span::-moz-selection {
+  color: transparent !important;
+  background: rgba(0, 100, 255, 0.3);
+}
+
 /* ─── PDF viewer ─── */
 .pdf-page-shadow {
   background: white;
@@ -194,6 +244,78 @@
 .pdf-match {
   background: rgba(255, 183, 0, 0.4);
   padding: 0 1px;
+}
+.pdf-citation-focus {
+  background: rgba(224, 154, 0, 0.44) !important;
+  outline: 2px solid rgba(224, 154, 0, 0.55);
+  animation: citation-pulse 1.2s ease-out;
+}
+@keyframes citation-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(224, 154, 0, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(224, 154, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 154, 0, 0); }
+}
+.pdf-annotation-highlight {
+  background: rgba(255, 204, 51, 0.42) !important;
+  border-bottom: 2px solid rgba(199, 133, 0, 0.50);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.pdf-annotation-note {
+  background: rgba(73, 171, 255, 0.34) !important;
+  border-bottom: 2px solid rgba(47, 121, 205, 0.55);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.pdf-annotation-active {
+  outline: 2px solid rgba(199, 133, 0, 0.65);
+  box-shadow: 0 0 0 4px rgba(255, 204, 51, 0.18);
+}
+.dark .pdf-annotation-highlight {
+  background: rgba(255, 204, 51, 0.35) !important;
+  border-bottom-color: rgba(255, 204, 51, 0.55);
+}
+.dark .pdf-annotation-note {
+  background: rgba(73, 171, 255, 0.30) !important;
+  border-bottom-color: rgba(73, 171, 255, 0.50);
+}
+.dark .pdf-annotation-active {
+  outline: 2px solid rgba(255, 204, 51, 0.60);
+  box-shadow: 0 0 0 4px rgba(255, 204, 51, 0.22);
+}
+.pdf-selection-toolbar {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border: 1px solid color-mix(in oklch, var(--foreground) 10%, var(--border));
+  background: color-mix(in oklch, var(--card) 94%, transparent);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  transform: translate(-50%, -100%);
+  backdrop-filter: blur(10px);
+}
+.annotation-card {
+  border: 1px solid color-mix(in oklch, var(--foreground) 6%, var(--border));
+  background: color-mix(in oklch, var(--card) 88%, transparent);
+  padding: 0.6rem 0.75rem;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.annotation-card:hover,
+.annotation-card:focus-visible {
+  border-color: color-mix(in oklch, var(--primary) 34%, var(--border));
+  background: color-mix(in oklch, var(--primary) 6%, var(--card));
+  outline: none;
+}
+.annotation-card:hover .annotation-card-delete {
+  opacity: 1;
+}
+.annotation-card-active {
+  border-color: color-mix(in oklch, var(--primary) 44%, var(--border));
+  background: color-mix(in oklch, var(--primary) 8%, var(--card));
 }
 
 /* ─── Cal-heatmap ─── */

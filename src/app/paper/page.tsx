@@ -172,9 +172,7 @@ export default function PaperListPage() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="bottom-right" />
-      <Header search={search} onSearchChange={setSearch}>
-        <span className="text-sm font-medium">Papers</span>
-        <div className="flex-1" />
+      <Header search={search} onSearchChange={setSearch} pageTitle="Papers">
         <Button
           size="sm"
           className="gap-1.5"
@@ -184,7 +182,7 @@ export default function PaperListPage() {
           Add Paper
         </Button>
       </Header>
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <main className="mx-auto max-w-2xl px-4 py-8 pb-20 sm:px-6 sm:pb-8">
         <PaperList
           papers={papers}
           loading={loading}
