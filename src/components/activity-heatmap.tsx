@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import "cal-heatmap/cal-heatmap.css";
 import type { PaperMetadata } from "@/types";
 
@@ -32,8 +30,7 @@ function writeCache(data: { date: number; value: number }[]) {
 }
 
 function buildHeatmapData(
-  papers: PaperMetadata[],
-  noteDates: string[]
+  papers: PaperMetadata[]
 ): { date: number; value: number }[] {
   const counts: Record<string, number> = {};
 
@@ -46,8 +43,6 @@ function buildHeatmapData(
   papers.forEach((p) => {
     if (p.addedAt) addDate(p.addedAt);
   });
-
-  noteDates.forEach((d) => addDate(d));
 
   return Object.entries(counts).map(([dateStr, value]) => ({
     date: Math.floor(new Date(dateStr).getTime() / 1000),
@@ -65,25 +60,19 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const calRef = useRef<any>(null);
 
-  // Note dates from Convex (realtime)
-  const noteDates = useQuery(api.notes.allDates);
-
   useEffect(() => {
     let destroyed = false;
 
-    // Use cached data for instant render, or wait for Convex
+    // Use cached data for instant render, or build from papers
     const cached = readCache();
-    const heatmapData =
-      noteDates !== undefined
-        ? buildHeatmapData(papers, noteDates)
-        : cached?.data ?? null;
+    const heatmapData = buildHeatmapData(papers);
 
-    if (!heatmapData) return;
-
-    // Persist when we have fresh Convex data
-    if (noteDates !== undefined) {
+    if (heatmapData.length > 0) {
       writeCache(heatmapData);
     }
+
+    const dataToUse = heatmapData.length > 0 ? heatmapData : cached?.data ?? null;
+    if (!dataToUse) return;
 
     async function init() {
       const [
@@ -113,7 +102,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       cal.paint(
         {
           data: {
-            source: heatmapData,
+            source: dataToUse,
             x: (d: { date: number }) => d.date * 1000,
             y: (d: { value: number }) => d.value,
             groupY: "sum",
@@ -192,7 +181,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       destroyed = true;
       calRef.current?.destroy();
     };
-  }, [papers, noteDates]);
+  }, [papers]);
 
   return (
     <div

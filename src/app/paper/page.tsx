@@ -6,8 +6,10 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Header } from "@/components/header";
 import { AddPaperDialog } from "@/components/add-paper-dialog";
+import { useDeletePaper, useRetryImport } from "@/hooks/use-paper-actions";
+import { parseImportStatus, importStateSortKey, stageLabel } from "@/lib/import-status";
 import { Button } from "@/components/ui/button";
-import { Plus, FileText, Trash2 } from "lucide-react";
+import { Plus, FileText, Trash2, Loader2, AlertTriangle, RotateCcw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +29,10 @@ interface PaperListProps {
   search: string;
   onSelect: (sanitizedId: string) => void;
   onDelete: (arxivId: string) => void;
+  onRetry: (arxivId: string) => void;
 }
 
-function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListProps) {
+function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: PaperListProps) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const filtered = search.trim()
@@ -88,24 +91,53 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
                 <p className="text-sm font-semibold leading-tight pr-8 line-clamp-2 transition-colors duration-300 group-hover:text-primary">
                   {paper.title}
                 </p>
-                <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/50">
-                  arXiv:{paper.arxivId}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/50">
+                    arXiv:{paper.arxivId}
+                  </span>
+                  {paper.importState.phase === "importing" && (
+                    <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      {stageLabel(paper.importState.stage)}
+                    </span>
+                  )}
+                  {paper.importState.phase === "failed" && (
+                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      IMPORT FAILED
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs leading-relaxed text-muted-foreground/50 line-clamp-2">
                   {paper.abstract}
                 </p>
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteTarget(paper.arxivId);
-                }}
-              >
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
-              </Button>
+              <div className="absolute right-2 top-3 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                {paper.importState.phase === "failed" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetry(paper.arxivId);
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 text-muted-foreground hover:text-primary" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTarget(paper.arxivId);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                </Button>
+              </div>
             </div>
           );
         })}
@@ -119,7 +151,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete }: PaperListPro
           <AlertDialogHeader>
             <AlertDialogTitle>Delete paper</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this paper and all its notes. This
+              This will permanently delete this paper. This
               action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -146,6 +178,8 @@ export default function PaperListPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const deletePaper = useDeletePaper();
+
   const convexPapers = useQuery(api.papers.list);
   const loading = convexPapers === undefined;
 
@@ -154,20 +188,36 @@ export default function PaperListPage() {
     title: p.title,
     authors: p.authors,
     abstract: p.abstract,
+    summary: p.summary,
     published: p.published,
     categories: p.categories,
     addedAt: p.addedAt,
+    importState: parseImportStatus(p.importStatus),
   }));
+
+  papers.sort((a, b) => importStateSortKey(a.importState) - importStateSortKey(b.importState));
+
+  const retryImport = useRetryImport();
+
+  const handleRetry = useCallback(async (arxivId: string) => {
+    const sanitized = arxivId.replace(/\//g, "_");
+    try {
+      await retryImport(sanitized);
+      toast.success("Retrying import");
+    } catch {
+      toast.error("Failed to retry import");
+    }
+  }, [retryImport]);
 
   const handleDelete = useCallback(async (arxivId: string) => {
     const sanitized = arxivId.replace(/\//g, "_");
     try {
-      await fetch(`/api/papers/${sanitized}`, { method: "DELETE" });
-      toast.success("Paper removed");
+      await deletePaper(sanitized);
+      toast.success("Paper removal queued");
     } catch {
       toast.error("Failed to delete paper");
     }
-  }, []);
+  }, [deletePaper]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -189,13 +239,14 @@ export default function PaperListPage() {
           search={search}
           onSelect={(id) => router.push(`/paper/${id}`)}
           onDelete={handleDelete}
+          onRetry={handleRetry}
         />
       </main>
       <AddPaperDialog
         open={addOpen}
         onOpenChange={setAddOpen}
         onAdded={() => {
-          toast.success("Paper added successfully");
+          toast.success("Paper import started");
         }}
       />
     </div>

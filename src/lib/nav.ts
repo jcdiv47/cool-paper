@@ -1,4 +1,4 @@
-import { Home, BookOpen, NotebookPen, MessageCircle } from "lucide-react";
+import { Home, BookOpen, MessageCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export interface NavItem {
@@ -12,7 +12,6 @@ export interface NavItem {
 /** Desktop top-nav (logo already acts as Home) */
 export const DESKTOP_NAV: NavItem[] = [
   { href: "/paper", label: "Papers", icon: BookOpen },
-  { href: "/notes", label: "Notes", icon: NotebookPen },
   { href: "/chat", label: "Chats", icon: MessageCircle },
 ];
 
@@ -20,6 +19,5 @@ export const DESKTOP_NAV: NavItem[] = [
 export const MOBILE_NAV: NavItem[] = [
   { href: "/", label: "Home", icon: Home, exact: true },
   { href: "/paper", label: "Papers", icon: BookOpen },
-  { href: "/notes", label: "Notes", icon: NotebookPen },
   { href: "/chat", label: "Chats", icon: MessageCircle },
 ];

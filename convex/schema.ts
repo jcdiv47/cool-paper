@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { normalizedModelMetadataEntryValidator } from "./lib/openRouterModels";
 
 export default defineSchema({
   papers: defineTable({
@@ -8,34 +9,24 @@ export default defineSchema({
     title: v.string(),
     authors: v.array(v.string()),
     abstract: v.string(),
+    summary: v.optional(v.string()),
     published: v.string(),
     categories: v.array(v.string()),
     addedAt: v.string(),
     activeIndexVersion: v.optional(v.number()),
+    pdfStorageId: v.optional(v.id("_storage")),
+    importStatus: v.optional(v.string()),
   })
     .index("by_arxivId", ["arxivId"])
     .index("by_sanitizedId", ["sanitizedId"])
     .index("by_addedAt", ["addedAt"]),
-
-  notes: defineTable({
-    paperId: v.id("papers"),
-    sanitizedPaperId: v.string(),
-    filename: v.string(),
-    title: v.string(),
-    content: v.string(),
-    model: v.optional(v.string()),
-    createdAt: v.string(),
-    modifiedAt: v.string(),
-  })
-    .index("by_paperId", ["paperId"])
-    .index("by_sanitizedPaperId", ["sanitizedPaperId"])
-    .index("by_modifiedAt", ["modifiedAt"]),
 
   threads: defineTable({
     title: v.string(),
     paperIds: v.array(v.string()),
     model: v.optional(v.string()),
     sessionId: v.optional(v.string()),
+    agentThreadId: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_updatedAt", ["updatedAt"]),
@@ -54,8 +45,8 @@ export default defineSchema({
 
   jobs: defineTable({
     type: v.union(
-      v.literal("note-generation"),
-      v.literal("paper-import")
+      v.literal("paper-import"),
+      v.literal("paper-delete")
     ),
     status: v.union(
       v.literal("pending"),
@@ -66,12 +57,13 @@ export default defineSchema({
     ),
     sanitizedPaperId: v.string(),
     paperId: v.optional(v.string()),
-    noteFilename: v.optional(v.string()),
-    prompt: v.optional(v.string()),
-    taskType: v.optional(v.string()),
     model: v.optional(v.string()),
+    payload: v.optional(v.string()),
+    workerId: v.optional(v.string()),
     startedAt: v.optional(v.string()),
+    lastHeartbeatAt: v.optional(v.number()),
     completedAt: v.optional(v.string()),
+    cancelRequestedAt: v.optional(v.string()),
     error: v.optional(v.string()),
     displayCommand: v.optional(v.string()),
   })
@@ -116,18 +108,6 @@ export default defineSchema({
     .index("by_paperId_indexVersion_refId", ["paperId", "indexVersion", "refId"])
     .index("by_paperId_page", ["paperId", "page"]),
 
-  note_citations: defineTable({
-    noteId: v.id("notes"),
-    paperId: v.id("papers"),
-    indexVersion: v.number(),
-    refId: v.string(),
-    occurrence: v.number(),
-    createdAt: v.string(),
-  })
-    .index("by_noteId", ["noteId"])
-    .index("by_noteId_occurrence", ["noteId", "occurrence"])
-    .index("by_paperId_refId", ["paperId", "refId"]),
-
   message_citations: defineTable({
     messageId: v.id("messages"),
     paperId: v.id("papers"),
@@ -160,4 +140,21 @@ export default defineSchema({
     .index("by_paperId", ["paperId"])
     .index("by_paperId_indexVersion", ["paperId", "indexVersion"])
     .index("by_paperId_chunkRefId", ["paperId", "chunkRefId"]),
+
+  paper_source_files: defineTable({
+    paperId: v.id("papers"),
+    relativePath: v.string(),
+    content: v.string(),
+    fileType: v.string(),
+  })
+    .index("by_paperId", ["paperId"])
+    .index("by_paperId_path", ["paperId", "relativePath"]),
+
+  model_metadata_cache: defineTable({
+    cacheKey: v.string(),
+    entries: v.array(normalizedModelMetadataEntryValidator),
+    fetchedAt: v.number(),
+    expiresAt: v.number(),
+    lastError: v.optional(v.string()),
+  }).index("by_cacheKey", ["cacheKey"]),
 });

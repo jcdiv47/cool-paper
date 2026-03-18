@@ -5,23 +5,9 @@ import type { Id } from "./_generated/dataModel";
 async function removePaperArtifacts(
   ctx: MutationCtx,
   paperId: Id<"papers">,
-  sanitizedId: string
+  sanitizedId: string,
+  excludeJobId?: Id<"jobs">
 ) {
-  const notes = await ctx.db
-    .query("notes")
-    .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
-    .collect();
-  for (const note of notes) {
-    const citations = await ctx.db
-      .query("note_citations")
-      .withIndex("by_noteId", (q) => q.eq("noteId", note._id))
-      .collect();
-    for (const citation of citations) {
-      await ctx.db.delete(citation._id);
-    }
-    await ctx.db.delete(note._id);
-  }
-
   const annotations = await ctx.db
     .query("annotations")
     .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
@@ -54,6 +40,21 @@ async function removePaperArtifacts(
     await ctx.db.delete(index._id);
   }
 
+  // Delete paper source files
+  const sourceFiles = await ctx.db
+    .query("paper_source_files")
+    .withIndex("by_paperId", (q) => q.eq("paperId", paperId))
+    .collect();
+  for (const file of sourceFiles) {
+    await ctx.db.delete(file._id);
+  }
+
+  // Delete PDF from storage
+  const paper = await ctx.db.get(paperId);
+  if (paper?.pdfStorageId) {
+    await ctx.storage.delete(paper.pdfStorageId);
+  }
+
   const jobs = await ctx.db
     .query("jobs")
     .withIndex("by_sanitizedPaperId", (q) =>
@@ -61,6 +62,8 @@ async function removePaperArtifacts(
     )
     .collect();
   for (const job of jobs) {
+    if (excludeJobId && job._id === excludeJobId) continue;
+    if (job.status === "running") continue;
     const events = await ctx.db
       .query("job_events")
       .withIndex("by_jobId", (q) => q.eq("jobId", job._id))
@@ -93,6 +96,13 @@ export const get = query({
   },
 });
 
+export const getPdfUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => {
+    return await ctx.storage.getUrl(storageId);
+  },
+});
+
 export const getById = query({
   args: { id: v.id("papers") },
   handler: async (ctx, { id }) => {
@@ -107,6 +117,7 @@ export const create = mutation({
     title: v.string(),
     authors: v.array(v.string()),
     abstract: v.string(),
+    summary: v.optional(v.string()),
     published: v.string(),
     categories: v.array(v.string()),
     addedAt: v.string(),
@@ -134,16 +145,49 @@ export const remove = mutation({
   },
 });
 
+export const updateImportStatus = mutation({
+  args: {
+    id: v.id("papers"),
+    importStatus: v.string(),
+  },
+  handler: async (ctx, { id, importStatus }) => {
+    await ctx.db.patch(id, { importStatus });
+  },
+});
+
+export const updateSummary = mutation({
+  args: {
+    id: v.id("papers"),
+    summary: v.string(),
+  },
+  handler: async (ctx, { id, summary }) => {
+    await ctx.db.patch(id, { summary });
+  },
+});
+
+export const updatePdfStorage = mutation({
+  args: {
+    id: v.id("papers"),
+    pdfStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, { id, pdfStorageId }) => {
+    await ctx.db.patch(id, { pdfStorageId });
+  },
+});
+
 export const removeBySanitizedId = mutation({
-  args: { sanitizedId: v.string() },
-  handler: async (ctx, { sanitizedId }) => {
+  args: {
+    sanitizedId: v.string(),
+    excludeJobId: v.optional(v.id("jobs")),
+  },
+  handler: async (ctx, { sanitizedId, excludeJobId }) => {
     const paper = await ctx.db
       .query("papers")
       .withIndex("by_sanitizedId", (q) => q.eq("sanitizedId", sanitizedId))
       .first();
     if (!paper) return;
 
-    await removePaperArtifacts(ctx, paper._id, sanitizedId);
+    await removePaperArtifacts(ctx, paper._id, sanitizedId, excludeJobId);
 
     await ctx.db.delete(paper._id);
   },

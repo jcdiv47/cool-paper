@@ -8,8 +8,6 @@ import fs from "fs/promises";
 import path from "path";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import type { Id } from "../convex/_generated/dataModel";
-
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 if (!CONVEX_URL) {
   console.error("NEXT_PUBLIC_CONVEX_URL not set");
@@ -32,18 +30,17 @@ async function syncPapers() {
     dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   } catch {
     console.log("No papers directory found, skipping.");
-    return new Map<string, Id<"papers">>();
+    return;
   }
 
-  const paperIdMap = new Map<string, Id<"papers">>();
-
+  let count = 0;
   for (const dir of dirs) {
     const metaPath = path.join(CACHE_DIR, dir, "metadata.json");
     try {
       const raw = await fs.readFile(metaPath, "utf-8");
       const meta = JSON.parse(raw);
       const sanitizedId = sanitizeArxivId(meta.arxivId);
-      const id = await client.mutation(api.papers.create, {
+      await client.mutation(api.papers.create, {
         arxivId: meta.arxivId,
         sanitizedId,
         title: meta.title,
@@ -53,74 +50,14 @@ async function syncPapers() {
         categories: meta.categories ?? [],
         addedAt: meta.addedAt ?? new Date().toISOString(),
       });
-      paperIdMap.set(sanitizedId, id);
+      count++;
       console.log(`  Paper: ${meta.title.slice(0, 60)}...`);
     } catch (e) {
       console.warn(`  Skipping ${dir}: ${e}`);
     }
   }
 
-  console.log(`Synced ${paperIdMap.size} papers.`);
-  return paperIdMap;
-}
-
-async function syncNotes(paperIdMap: Map<string, Id<"papers">>) {
-  console.log("Syncing notes...");
-  let count = 0;
-
-  for (const [sanitizedId, paperId] of paperIdMap) {
-    const notesDir = path.join(CACHE_DIR, sanitizedId, "notes");
-    let files: string[];
-    try {
-      const entries = await fs.readdir(notesDir);
-      files = entries.filter(
-        (f) => f.endsWith(".md") && !f.startsWith(".")
-      );
-    } catch {
-      continue;
-    }
-
-    // Read .meta.json for model info
-    let noteMeta: Record<string, { model?: string }> = {};
-    try {
-      const metaRaw = await fs.readFile(
-        path.join(notesDir, ".meta.json"),
-        "utf-8"
-      );
-      noteMeta = JSON.parse(metaRaw);
-    } catch {
-      // no meta
-    }
-
-    for (const file of files) {
-      try {
-        const content = await fs.readFile(
-          path.join(notesDir, file),
-          "utf-8"
-        );
-        const stat = await fs.stat(path.join(notesDir, file));
-        const title = file.replace(/\.md$/, "").replace(/-/g, " ");
-        const model = noteMeta[file]?.model;
-
-        await client.mutation(api.notes.upsert, {
-          paperId,
-          sanitizedPaperId: sanitizedId,
-          filename: file,
-          title,
-          content,
-          model: model ?? undefined,
-          createdAt: stat.birthtime.toISOString(),
-          modifiedAt: stat.mtime.toISOString(),
-        });
-        count++;
-        console.log(`  Note: ${sanitizedId}/${file}`);
-      } catch (e) {
-        console.warn(`  Skipping note ${file}: ${e}`);
-      }
-    }
-  }
-
-  console.log(`Synced ${count} notes.`);
+  console.log(`Synced ${count} papers.`);
 }
 
 async function syncThreads() {
@@ -176,8 +113,7 @@ async function syncThreads() {
 
 async function main() {
   console.log("Starting sync to Convex...\n");
-  const paperIdMap = await syncPapers();
-  await syncNotes(paperIdMap);
+  await syncPapers();
   await syncThreads();
   console.log("\nSync complete!");
 }

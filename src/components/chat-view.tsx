@@ -2,21 +2,22 @@
 
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useQuery } from "convex/react";
-import { Send, Square, MessageCircle, ChevronRight, Brain, LoaderCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
+  Send,
+  Square,
+  MessageCircle,
+  ChevronRight,
+  Brain,
+  LoaderCircle,
+  ChevronsUpDown,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { MODEL_OPTIONS } from "@/lib/models";
+import { getModelLabel } from "@/lib/models";
 import { PaperCardRow } from "@/components/paper-card-row";
 import {
   CitationMarkdown,
@@ -25,11 +26,13 @@ import {
 } from "@/components/citation-markdown";
 import { parseAnnotationTokens } from "@/lib/annotation-links";
 import { parseCitationTokens } from "@/lib/citations";
+import { ModelPickerDialog } from "@/components/model-picker-dialog";
 import { api } from "../../convex/_generated/api";
 import type { ThreadMessage, PaperMetadata } from "@/types";
 
 interface ChatViewProps {
   messages: ThreadMessage[];
+  streamingMessage: ThreadMessage | null;
   isStreaming: boolean;
   isThinking: boolean;
   error: string | null;
@@ -40,6 +43,8 @@ interface ChatViewProps {
   papers?: PaperMetadata[];
   onRemovePaper?: (paperId: string) => void;
   onAddPaperClick?: () => void;
+  onNavigate?: (href: string) => void;
+  hidePaperCards?: boolean;
 }
 
 const SINGLE_SUGGESTIONS = [
@@ -64,10 +69,60 @@ function ThinkingCard({
   isActivelyThinking: boolean;
 }) {
   const [manualOpen, setManualOpen] = useState<boolean | null>(null);
+  const thinkingScrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(false);
+  const lastThinkingScrollTopRef = useRef(0);
 
   // Auto behavior: expand while actively thinking with content, collapse when done
   const autoOpen = isActivelyThinking && !!thinking;
   const isOpen = manualOpen ?? autoOpen;
+
+  const scrollThinkingToBottom = useCallback(() => {
+    const el = thinkingScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    lastThinkingScrollTopRef.current = el.scrollTop;
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      stickToBottomRef.current = false;
+      lastThinkingScrollTopRef.current = 0;
+      return;
+    }
+
+    const el = thinkingScrollRef.current;
+    if (!el) return;
+    lastThinkingScrollTopRef.current = el.scrollTop;
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isActivelyThinking || !isOpen || !stickToBottomRef.current) {
+      return;
+    }
+
+    let rafId = 0;
+    rafId = window.requestAnimationFrame(() => {
+      scrollThinkingToBottom();
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [isActivelyThinking, isOpen, thinking, scrollThinkingToBottom]);
+
+  const handleThinkingScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const el = event.currentTarget;
+      const scrollingDown = el.scrollTop > lastThinkingScrollTopRef.current;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+
+      if (scrollingDown && nearBottom) {
+        stickToBottomRef.current = true;
+      }
+
+      lastThinkingScrollTopRef.current = el.scrollTop;
+    },
+    []
+  );
 
   // Working state: no thinking content yet, just show activity indicator
   if (isActivelyThinking && !thinking) {
@@ -102,7 +157,11 @@ function ThinkingCard({
         )}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="mt-2 rounded-md border border-border/40 bg-muted/20 px-3 py-2 text-xs font-mono text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
+        <div
+          ref={thinkingScrollRef}
+          onScroll={handleThinkingScroll}
+          className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border/40 bg-muted/20 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+        >
           {thinking}
         </div>
       </CollapsibleContent>
@@ -110,8 +169,96 @@ function ThinkingCard({
   );
 }
 
+function AssistantMessage({
+  message,
+  isMultiPaper,
+  citationTargets,
+  annotationTargets,
+  onNavigate,
+}: {
+  message: ThreadMessage;
+  isMultiPaper: boolean;
+  citationTargets: Record<string, CitationTarget>;
+  annotationTargets: Record<string, AnnotationTarget>;
+  onNavigate?: (href: string) => void;
+}) {
+  return (
+    <div className="w-full">
+      {message.model && (
+        <span className="mb-1 block text-[10px] text-muted-foreground/50">
+          {getModelLabel(message.model)}
+        </span>
+      )}
+      {message.thinking ? (
+        <ThinkingCard
+          thinking={message.thinking}
+          isActivelyThinking={false}
+        />
+      ) : null}
+      {message.content ? (
+        <article className="prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif">
+          <CitationMarkdown
+            content={message.content}
+            targets={citationTargets}
+            annotationTargets={annotationTargets}
+            showPaperLabel={isMultiPaper}
+            onNavigate={onNavigate}
+          />
+        </article>
+      ) : null}
+    </div>
+  );
+}
+
+function StreamingAssistantMessage({
+  message,
+  isThinking,
+  showCursor,
+  isMultiPaper,
+  citationTargets,
+  annotationTargets,
+  onNavigate,
+}: {
+  message: ThreadMessage;
+  isThinking: boolean;
+  showCursor: boolean;
+  isMultiPaper: boolean;
+  citationTargets: Record<string, CitationTarget>;
+  annotationTargets: Record<string, AnnotationTarget>;
+  onNavigate?: (href: string) => void;
+}) {
+  return (
+    <div className="w-full">
+      {message.model && (
+        <span className="mb-1 block text-[10px] text-muted-foreground/50">
+          {getModelLabel(message.model)}
+        </span>
+      )}
+      <ThinkingCard
+        thinking={message.thinking}
+        isActivelyThinking={isThinking}
+      />
+      {message.content ? (
+        <article className={`prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif${showCursor ? ' streaming-cursor' : ''}`}>
+          <CitationMarkdown
+            content={message.content}
+            targets={citationTargets}
+            annotationTargets={annotationTargets}
+            showPaperLabel={isMultiPaper}
+            onNavigate={onNavigate}
+            sanitizePartial
+          />
+        </article>
+      ) : !isThinking ? (
+        <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-foreground/60" />
+      ) : null}
+    </div>
+  );
+}
+
 export function ChatView({
   messages,
+  streamingMessage,
   isStreaming,
   isThinking,
   error,
@@ -122,8 +269,11 @@ export function ChatView({
   papers,
   onRemovePaper,
   onAddPaperClick,
+  onNavigate,
+  hidePaperCards,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userScrolledUp = useRef(false);
@@ -156,17 +306,31 @@ export function ChatView({
 
   useEffect(() => {
     if (userScrolledUp.current) return;
-    if (justSubmittedRef.current && lastUserMsgRef.current && scrollRef.current) {
-      // Scroll so user's message is near the top of the viewport
-      const container = scrollRef.current;
-      const msgEl = lastUserMsgRef.current;
-      container.scrollTop = msgEl.offsetTop - 24;
-      justSubmittedRef.current = false;
-    } else if (scrollRef.current) {
-      // During streaming, keep scrolling to bottom to follow new content
+    if (!scrollRef.current) return;
+
+    let rafId = 0;
+    rafId = window.requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+
+      if (justSubmittedRef.current && lastUserMsgRef.current) {
+        // Scroll so the newest user turn lands near the top of the viewport.
+        scrollRef.current.scrollTop = lastUserMsgRef.current.offsetTop - 24;
+        justSubmittedRef.current = false;
+        return;
+      }
+
+      // During streaming, keep the viewport pinned to the latest content.
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [
+    isStreaming,
+    isThinking,
+    messages,
+    streamingMessage?.content,
+    streamingMessage?.thinking,
+  ]);
 
   // Auto-resize textarea
   const resizeTextarea = useCallback(() => {
@@ -196,29 +360,37 @@ export function ChatView({
   }
 
   const isMultiPaper = papers && papers.length > 1;
+  const lastUserMessageIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i]?.role === "user") return i;
+    }
+    return -1;
+  }, [messages]);
   const citationRefIds = useMemo(
     () =>
       [
         ...new Set(
-          messages.flatMap((msg) =>
-            parseCitationTokens(msg.content).map((citation) => citation.refId)
+          [...messages, ...(streamingMessage ? [streamingMessage] : [])].flatMap(
+            (msg) =>
+              parseCitationTokens(msg.content).map((citation) => citation.refId)
           )
         ),
       ],
-    [messages]
+    [messages, streamingMessage]
   );
   const annotationIds = useMemo(
     () =>
       [
         ...new Set(
-          messages.flatMap((msg) =>
-            parseAnnotationTokens(msg.content).map(
-              (annotation) => annotation.annotationId
-            )
+          [...messages, ...(streamingMessage ? [streamingMessage] : [])].flatMap(
+            (msg) =>
+              parseAnnotationTokens(msg.content).map(
+                (annotation) => annotation.annotationId
+              )
           )
         ),
       ],
-    [messages]
+    [messages, streamingMessage]
   );
   const citationTargetsResult = useQuery(
     api.paperChunks.resolveAcrossSanitizedIds,
@@ -264,6 +436,7 @@ export function ChatView({
             sanitizedId: annotation.sanitizedId,
             kind: annotation.kind,
             comment: annotation.comment,
+            exact: annotation.exact,
           },
         ])
       ),
@@ -276,11 +449,48 @@ export function ChatView({
   const emptyHeading = isMultiPaper
     ? "Ask about these papers"
     : "Ask anything about this paper";
+  const hasConversation =
+    messages.length > 0 || Boolean(streamingMessage) || isStreaming;
+  const renderedMessages = useMemo(
+    () =>
+      messages.map((msg, i) => (
+        <div
+          key={`${msg.timestamp}-${msg.role}-${i}`}
+          ref={i === lastUserMessageIndex && msg.role === "user" ? lastUserMsgRef : undefined}
+        >
+          {msg.role === "user" ? (
+            <div className="flex justify-end">
+              <div className="max-w-[85%] bg-primary/10 px-4 py-2.5">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {msg.content}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <AssistantMessage
+              message={msg}
+              isMultiPaper={Boolean(isMultiPaper)}
+              citationTargets={citationTargets}
+              annotationTargets={annotationTargets}
+              onNavigate={onNavigate}
+            />
+          )}
+        </div>
+      )),
+    [
+      annotationTargets,
+      citationTargets,
+      isMultiPaper,
+      lastUserMessageIndex,
+      messages,
+      onNavigate,
+    ]
+  );
 
   return (
     <div className="flex h-full flex-col">
       {/* Paper cards row */}
-      {papers && papers.length > 0 && onRemovePaper && onAddPaperClick && (
+      {!hidePaperCards && papers && papers.length > 0 && onRemovePaper && onAddPaperClick && (
         <div className="border-b border-border/40">
           <div className="mx-auto max-w-3xl">
             <PaperCardRow
@@ -295,7 +505,7 @@ export function ChatView({
       {/* Messages area */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8">
-          {messages.length === 0 ? (
+          {!hasConversation ? (
             <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
               <div className="flex h-14 w-14 items-center justify-center bg-secondary">
                 <MessageCircle className="h-6 w-6 text-primary" />
@@ -324,69 +534,22 @@ export function ChatView({
             </div>
           ) : (
             <div className="space-y-6">
-              {messages.map((msg, i) => {
-                const isLastMessage = i === messages.length - 1;
-                const isActiveAssistant =
-                  msg.role === "assistant" && isLastMessage && isStreaming;
-
-                return (
-                  <div key={i} ref={isLastMessage && msg.role === "user" ? lastUserMsgRef : undefined}>
-                    {msg.role === "user" ? (
-                      <div className="flex justify-end">
-                        <div className="max-w-[85%] bg-primary/10 px-4 py-2.5">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {msg.content}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full">
-                        {msg.model && (
-                          <span className="text-[10px] text-muted-foreground/50 mb-1 block">
-                            {MODEL_OPTIONS.find((m) => m.id === msg.model)?.label ?? msg.model}
-                          </span>
-                        )}
-                        {/* Thinking card: show during active thinking OR for completed messages with thinking */}
-                        {(isActiveAssistant && (isThinking || msg.thinking)) ||
-                        (!isActiveAssistant && msg.thinking) ? (
-                          <ThinkingCard
-                            thinking={msg.thinking}
-                            isActivelyThinking={
-                              isActiveAssistant && isThinking
-                            }
-                          />
-                        ) : null}
-                        {msg.content ? (
-                          <article className="prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif">
-                            <CitationMarkdown
-                              content={msg.content}
-                              targets={citationTargets}
-                              annotationTargets={annotationTargets}
-                              showPaperLabel={Boolean(isMultiPaper)}
-                            />
-                          </article>
-                        ) : isStreaming && isLastMessage && !isThinking ? (
-                          <span className="inline-block h-4 w-1.5 animate-pulse bg-foreground/60 rounded-sm" />
-                        ) : null}
-                        {isStreaming &&
-                          isLastMessage &&
-                          !isThinking &&
-                          msg.content && (
-                            <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-foreground/60 rounded-sm align-text-bottom" />
-                          )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {/* Show thinking indicator while waiting for first assistant partial */}
-              {isStreaming &&
-                messages.length > 0 &&
-                messages.at(-1)?.role === "user" && (
-                  <div className="w-full">
-                    <ThinkingCard isActivelyThinking={true} />
-                  </div>
-                )}
+              {renderedMessages}
+              {streamingMessage ? (
+                <StreamingAssistantMessage
+                  message={streamingMessage}
+                  isThinking={isThinking}
+                  showCursor={isStreaming && !isThinking}
+                  isMultiPaper={Boolean(isMultiPaper)}
+                  citationTargets={citationTargets}
+                  annotationTargets={annotationTargets}
+                  onNavigate={onNavigate}
+                />
+              ) : isStreaming ? (
+                <div className="w-full">
+                  <ThinkingCard isActivelyThinking={true} />
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -401,18 +564,17 @@ export function ChatView({
       {/* Input area */}
       <div className="border-t border-border/40 bg-background">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-8">
-          <Select value={model} onValueChange={onModelChange} disabled={isStreaming}>
-            <SelectTrigger size="sm" className="w-auto text-xs shrink-0">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper" side="top">
-              {MODEL_OPTIONS.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 shrink-0 gap-2 rounded-xl px-3 text-left"
+            onClick={() => setModelPickerOpen(true)}
+            disabled={isStreaming}
+          >
+            <div className="text-xs font-medium">{getModelLabel(model)}</div>
+            <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
           <textarea
             ref={textareaRef}
             value={input}
@@ -447,6 +609,13 @@ export function ChatView({
           )}
         </div>
       </div>
+      <ModelPickerDialog
+        open={modelPickerOpen}
+        onOpenChange={setModelPickerOpen}
+        selectedModel={model}
+        onSelectModel={onModelChange}
+        disabled={isStreaming}
+      />
     </div>
   );
 }

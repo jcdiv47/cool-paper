@@ -1,16 +1,52 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+
+const jobType = v.union(
+  v.literal("paper-import"),
+  v.literal("paper-delete")
+);
+
+async function requestJobCancellation(
+  ctx: MutationCtx,
+  job: Doc<"jobs">
+) {
+  if (job.status !== "running" && job.status !== "pending") {
+    return false;
+  }
+
+  if (job.status === "pending") {
+    await ctx.db.patch(job._id, {
+      status: "cancelled",
+      cancelRequestedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  await ctx.db.patch(job._id, {
+    cancelRequestedAt: new Date().toISOString(),
+  });
+  return true;
+}
 
 export const getForPaper = query({
-  args: { sanitizedPaperId: v.string() },
-  handler: async (ctx, { sanitizedPaperId }) => {
+  args: {
+    sanitizedPaperId: v.string(),
+    type: v.optional(jobType),
+  },
+  handler: async (ctx, { sanitizedPaperId, type }) => {
     const jobs = await ctx.db
       .query("jobs")
       .withIndex("by_sanitizedPaperId", (q) =>
         q.eq("sanitizedPaperId", sanitizedPaperId)
       )
       .order("desc")
-      .take(1);
+      .collect();
+    if (type) {
+      const filtered = jobs.find((j) => j.type === type);
+      return filtered ?? null;
+    }
     return jobs[0] ?? null;
   },
 });
@@ -22,14 +58,12 @@ export const get = query({
   },
 });
 
+/** Create a job as running (used by Convex actions for progress tracking) */
 export const create = mutation({
   args: {
-    type: v.union(v.literal("note-generation"), v.literal("paper-import")),
+    type: jobType,
     sanitizedPaperId: v.string(),
     paperId: v.optional(v.string()),
-    noteFilename: v.optional(v.string()),
-    prompt: v.optional(v.string()),
-    taskType: v.optional(v.string()),
     model: v.optional(v.string()),
     displayCommand: v.optional(v.string()),
   },
@@ -42,6 +76,62 @@ export const create = mutation({
   },
 });
 
+/** UI requests cancellation */
+export const requestCancel = mutation({
+  args: { id: v.id("jobs") },
+  handler: async (ctx, { id }) => {
+    const job = await ctx.db.get(id);
+    if (!job) return false;
+    return await requestJobCancellation(ctx, job);
+  },
+});
+
+export const requestCancelForPaper = mutation({
+  args: {
+    sanitizedPaperId: v.string(),
+    excludeJobId: v.optional(v.id("jobs")),
+  },
+  handler: async (ctx, { sanitizedPaperId, excludeJobId }) => {
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_sanitizedPaperId", (q) =>
+        q.eq("sanitizedPaperId", sanitizedPaperId)
+      )
+      .collect();
+
+    let cancelled = 0;
+    for (const job of jobs) {
+      if (excludeJobId && job._id === excludeJobId) continue;
+      if (await requestJobCancellation(ctx, job)) {
+        cancelled++;
+      }
+    }
+
+    return cancelled;
+  },
+});
+
+export const listActiveForPaper = query({
+  args: {
+    sanitizedPaperId: v.string(),
+    excludeJobId: v.optional(v.id("jobs")),
+  },
+  handler: async (ctx, { sanitizedPaperId, excludeJobId }) => {
+    const jobs = await ctx.db
+      .query("jobs")
+      .withIndex("by_sanitizedPaperId", (q) =>
+        q.eq("sanitizedPaperId", sanitizedPaperId)
+      )
+      .collect();
+
+    return jobs.filter((job) => {
+      if (excludeJobId && job._id === excludeJobId) return false;
+      return job.status === "pending" || job.status === "running";
+    });
+  },
+});
+
+/** Mark job completed */
 export const complete = mutation({
   args: {
     id: v.id("jobs"),
@@ -53,22 +143,13 @@ export const complete = mutation({
     error: v.optional(v.string()),
   },
   handler: async (ctx, { id, status, error }) => {
+    const job = await ctx.db.get(id);
+    if (!job) return false;
+
     await ctx.db.patch(id, {
       status,
       completedAt: new Date().toISOString(),
       ...(error ? { error } : {}),
-    });
-  },
-});
-
-export const cancel = mutation({
-  args: { id: v.id("jobs") },
-  handler: async (ctx, { id }) => {
-    const job = await ctx.db.get(id);
-    if (!job || job.status !== "running") return false;
-    await ctx.db.patch(id, {
-      status: "cancelled",
-      completedAt: new Date().toISOString(),
     });
     return true;
   },

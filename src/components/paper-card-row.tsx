@@ -3,6 +3,7 @@
 import { X, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { buildPaperWorkspaceHref } from "@/lib/paper-workspace";
 import type { PaperMetadata } from "@/types";
 
 interface PaperCardRowProps {
@@ -27,7 +28,7 @@ export function PaperCardRow({ papers, onRemove, onAddClick }: PaperCardRowProps
               {paper.title}
             </p>
             <Link
-              href={`/paper/${sanitizedId}?tab=pdf`}
+              href={buildPaperWorkspaceHref(sanitizedId)}
               className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 transition-colors hover:text-foreground"
             >
               <ExternalLink className="h-2.5 w-2.5" />

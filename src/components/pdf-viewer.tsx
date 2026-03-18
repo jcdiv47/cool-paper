@@ -8,7 +8,7 @@ import {
   useMemo,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -26,6 +26,15 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ChevronUp,
   ChevronDown,
   ZoomIn,
@@ -34,12 +43,13 @@ import {
   Search,
   X,
   Maximize2,
-  Columns2,
-  Quote,
   Highlighter,
   StickyNote,
   Trash2,
+  PenLine,
   PanelRight,
+  MessageCircle,
+  AlignLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +73,9 @@ const MAX_SELECTION_CHARS = 1200;
 
 interface PdfViewerProps {
   paperId: string;
+  onToggleChat?: () => void;
+  onViewSummary?: () => void;
+  chatOpen?: boolean;
 }
 
 interface PendingSelection {
@@ -143,18 +156,22 @@ function annotationToneClass(kind: "highlight" | "note") {
   return kind === "note" ? "pdf-annotation-note" : "pdf-annotation-highlight";
 }
 
-export function PdfViewer({ paperId }: PdfViewerProps) {
+export function PdfViewer({
+  paperId,
+  onToggleChat,
+  onViewSummary,
+  chatOpen,
+}: PdfViewerProps) {
   const searchParams = useSearchParams();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  const router = useRouter();
-  const pathname = usePathname();
   const citeRefId = searchParams.get("cite");
   const annotationParam = searchParams.get("annotation");
   const pageParam = searchParams.get("page");
 
   const paper = useQuery(api.papers.get, { sanitizedId: paperId });
   const createAnnotation = useMutation(api.annotations.create);
+  const updateAnnotation = useMutation(api.annotations.update);
   const removeAnnotation = useMutation(api.annotations.remove);
 
   // Document state
@@ -165,7 +182,7 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
 
   // Zoom state
   const [zoom, setZoom] = useState(100);
-  const [fitWidth, setFitWidth] = useState(true);
+  const [fitMode, setFitMode] = useState<"width" | "height" | null>("height");
 
   // UI state
   const [sidebar, setSidebar] = useState(false);
@@ -173,8 +190,20 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
   const [query, setQuery] = useState("");
   const [twoCol, setTwoCol] = useState(false);
   const [annotationsOpen, setAnnotationsOpen] = useState(false);
-  const [citationBannerOpen, setCitationBannerOpen] = useState(true);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editComment, setEditComment] = useState("");
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    annotationId: string;
+  } | null>(null);
+  const [annotationDetail, setAnnotationDetail] = useState<{
+    x: number;
+    y: number;
+    annotationId: string;
+  } | null>(null);
   const [noteComment, setNoteComment] = useState("");
   const [pendingSelection, setPendingSelection] =
     useState<PendingSelection | null>(null);
@@ -188,6 +217,7 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
 
   // Layout measurements
   const [cWidth, setCWidth] = useState(0);
+  const [cHeight, setCHeight] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageEls = useRef(new Map<number, HTMLDivElement>());
   const searchRef = useRef<HTMLInputElement>(null);
@@ -263,21 +293,27 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver((entries) =>
-      setCWidth(entries[0]!.contentRect.width),
-    );
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]!.contentRect;
+      setCWidth(rect.width);
+      setCHeight(rect.height);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [numPages]);
 
   // Rendered page width
   const pageWidth = useMemo(() => {
-    if (fitWidth && cWidth > 0) {
+    if (fitMode === "width" && cWidth > 0) {
       if (twoCol) return Math.min((cWidth - 56) / 2, 700);
       return Math.min(cWidth - 40, 1400);
     }
+    if (fitMode === "height" && cHeight > 0 && pageDims.h > 0) {
+      const fitH = cHeight - 16; // small padding
+      return fitH * (pageDims.w / pageDims.h);
+    }
     return (pageDims.w * zoom) / 100;
-  }, [fitWidth, cWidth, zoom, pageDims.w, twoCol]);
+  }, [fitMode, cWidth, cHeight, zoom, pageDims.w, pageDims.h, twoCol]);
 
   // Page height (uniform assumption — valid for academic papers)
   const pageHeight = useMemo(
@@ -287,10 +323,10 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
 
   // Display zoom percentage
   const displayZoom = useMemo(() => {
-    if (fitWidth && pageDims.w > 0)
+    if (fitMode && pageDims.w > 0)
       return Math.round((pageWidth / pageDims.w) * 100);
     return zoom;
-  }, [fitWidth, pageWidth, pageDims.w, zoom]);
+  }, [fitMode, pageWidth, pageDims.w, zoom]);
 
   // Document loaded
   const onDocLoad = useCallback(
@@ -396,14 +432,14 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
   const zoomIn = useCallback(() => {
     const base = displayZoom;
     const next = Math.ceil((base + 1) / ZOOM_STEP) * ZOOM_STEP;
-    setFitWidth(false);
+    setFitMode(null);
     setZoom(Math.min(ZOOM_MAX, next));
   }, [displayZoom]);
 
   const zoomOut = useCallback(() => {
     const base = displayZoom;
     const next = Math.floor((base - 1) / ZOOM_STEP) * ZOOM_STEP;
-    setFitWidth(false);
+    setFitMode(null);
     setZoom(Math.max(ZOOM_MIN, next));
   }, [displayZoom]);
 
@@ -461,7 +497,12 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
     [scrollTo],
   );
 
-  const fileUrl = `/api/papers/${paperId}/pdf`;
+  // PDF URL from Convex storage
+  const pdfStorageUrl = useQuery(
+    api.papers.getPdfUrl,
+    paper?.pdfStorageId ? { storageId: paper.pdfStorageId } : "skip",
+  );
+  const fileUrl = pdfStorageUrl ?? null;
   const pages = useMemo(
     () => Array.from({ length: numPages }, (_, i) => i + 1),
     [numPages],
@@ -489,10 +530,6 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
     setFocusedAnnotationId(annotationParam);
     setRenderSet((prev) => new Set(prev).add(linkedAnnotation.page));
   }, [annotationParam, linkedAnnotation]);
-
-  useEffect(() => {
-    if (focusedCitation) setCitationBannerOpen(true);
-  }, [focusedCitation]);
 
   useEffect(() => {
     clearCitationFocus();
@@ -665,6 +702,34 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
     setPendingSelection((current) => (current ? null : current));
   }, [pageWidth, twoCol]);
 
+  // Close context menu on click/scroll anywhere
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [contextMenu]);
+
+  // Close annotation detail on click or scroll outside
+  useEffect(() => {
+    if (!annotationDetail) return;
+    const close = (e: Event) => {
+      const target = e.target;
+      if (target instanceof Element && target.closest?.("[data-annotation-detail]")) return;
+      setAnnotationDetail(null);
+    };
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [annotationDetail]);
+
   // In two-column mode, ensure paired pages always render together
   const effectiveRenderSet = useMemo(() => {
     const set = new Set(renderSet);
@@ -783,10 +848,69 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
       );
       if (!annotation) return;
 
-      focusAnnotation(annotation.annotationId, annotation.page);
+      setAnnotationDetail({ x: event.clientX, y: event.clientY, annotationId });
+      event.stopPropagation();
     },
-    [annotations, focusAnnotation],
+    [annotations],
   );
+
+  const handleAnnotationContextMenu = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const annotated = target.closest<HTMLElement>("[data-annotation-id]");
+      const annotationId = annotated?.dataset.annotationId;
+      if (!annotationId) return;
+
+      const annotation = annotations.find(
+        (candidate) => candidate.annotationId === annotationId,
+      );
+      if (!annotation) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenu({ x: event.clientX, y: event.clientY, annotationId });
+    },
+    [annotations],
+  );
+
+  const openEditDialog = useCallback(
+    (annotationId: string) => {
+      const annotation = annotations.find(
+        (candidate) => candidate.annotationId === annotationId,
+      );
+      if (!annotation) return;
+      setEditingAnnotationId(annotationId);
+      setEditComment(annotation.comment ?? "");
+      setEditDialogOpen(true);
+      setContextMenu(null);
+    },
+    [annotations],
+  );
+
+  const saveEditAnnotation = useCallback(async () => {
+    if (!editingAnnotationId) return;
+    const annotation = annotations.find(
+      (candidate) => candidate.annotationId === editingAnnotationId,
+    );
+    if (!annotation) return;
+
+    try {
+      await updateAnnotation({
+        id: annotation._id,
+        comment: editComment.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+      });
+      setEditDialogOpen(false);
+      setEditingAnnotationId(null);
+      toast.success("Annotation updated.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update annotation.",
+      );
+    }
+  }, [annotations, editComment, editingAnnotationId, updateAnnotation]);
 
   const saveSelection = useCallback(
     async (kind: "highlight" | "note", comment?: string) => {
@@ -871,6 +995,21 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
   return (
     <div className="relative flex h-full flex-col bg-background">
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/40 bg-muted/30 px-2 backdrop-blur-sm">
+        {onViewSummary && (
+          <>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={onViewSummary}
+              className="gap-1.5"
+              title="Back to summary"
+            >
+              <AlignLeft className="h-3.5 w-3.5" />
+              <span className="text-xs">Summary</span>
+            </Button>
+            <Sep />
+          </>
+        )}
         <Button
           variant="ghost"
           size="icon-xs"
@@ -938,38 +1077,46 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
         >
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => setFitWidth((f) => !f)}
-          className={cn(fitWidth && "bg-accent")}
-          title="Fit to width"
-        >
-          <Maximize2 className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => setTwoCol((t) => !t)}
-          className={cn(twoCol && "bg-accent")}
-          title="Two-column view"
-        >
-          <Columns2 className="h-3.5 w-3.5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className={cn((fitMode || twoCol) && "bg-accent")}
+              title="View options"
+            >
+              <Maximize2 className="h-3 w-3" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" side="top" className="min-w-[10rem]">
+            <DropdownMenuRadioGroup
+              value={fitMode ?? "none"}
+              onValueChange={(v) =>
+                setFitMode(v === "none" ? null : (v as "width" | "height"))
+              }
+            >
+              <DropdownMenuRadioItem value="height">
+                Fit to height
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="width">
+                Fit to width
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="none">
+                Manual zoom
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={twoCol}
+              onCheckedChange={() => setTwoCol((t) => !t)}
+            >
+              Two-column view
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <div className="flex-1" />
 
-        {focusedCitation && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => setCitationBannerOpen((prev) => !prev)}
-            className={cn(citationBannerOpen && "bg-accent")}
-            title="Toggle citation banner"
-          >
-            <Quote className="h-3.5 w-3.5" />
-          </Button>
-        )}
         <Button
           variant="ghost"
           size="xs"
@@ -980,6 +1127,17 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
           <Highlighter className="h-3.5 w-3.5" />
           <span>{annotations.length}</span>
         </Button>
+        {onToggleChat && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onToggleChat}
+            className={cn(chatOpen && "bg-accent")}
+            title="Toggle chat (C)"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon-xs"
@@ -1024,64 +1182,6 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
               <X className="h-3 w-3" />
             </button>
           )}
-        </div>
-      )}
-
-      {focusedCitation && citationBannerOpen && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-border/30 border-l-[3px] border-l-primary bg-background px-3 py-2.5 text-sm">
-          <Quote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary/70">
-              Focused Citation · Page {focusedCitation.page}
-            </p>
-            <p className="line-clamp-2 text-muted-foreground">
-              {focusedCitation.text}
-            </p>
-          </div>
-          <button
-            onClick={() => setCitationBannerOpen(false)}
-            className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
-            aria-label="Hide citation banner"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {focusedAnnotation && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-border/30 border-l-[3px] border-l-chart-1 bg-background px-3 py-2.5 text-sm">
-          <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-chart-1" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-chart-1/80">
-              {annotationKindLabel(focusedAnnotation.kind)} · Page{" "}
-              {focusedAnnotation.page}
-            </p>
-            {focusedAnnotation.comment && (
-              <p className="line-clamp-2 font-medium text-foreground">
-                {focusedAnnotation.comment}
-              </p>
-            )}
-            <p className="line-clamp-2 text-muted-foreground">
-              {focusedAnnotation.exact}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={() => void deleteAnnotation(focusedAnnotation.annotationId)}
-              disabled={deletingAnnotationId === focusedAnnotation.annotationId}
-              className="rounded p-0.5 text-muted-foreground hover:text-destructive disabled:opacity-50"
-              aria-label="Delete annotation"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => setFocusedAnnotationId(null)}
-              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-              aria-label="Clear annotation focus"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
       )}
 
@@ -1132,6 +1232,7 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
           ref={scrollRef}
           onMouseUp={captureSelection}
           onClick={handleAnnotationClick}
+          onContextMenu={handleAnnotationContextMenu}
           className={cn("flex-1 overflow-auto", isDark && "pdf-dark-pages")}
         >
           {rows.map((row) => (
@@ -1263,6 +1364,86 @@ export function PdfViewer({ paperId }: PdfViewerProps) {
               disabled={savingAnnotation || !pendingSelection}
             >
               Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {contextMenu && (
+        <div
+          className="fixed z-50 min-w-[140px] rounded-md border border-border bg-popover p-1 shadow-md"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+            onClick={() => openEditDialog(contextMenu.annotationId)}
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
+            disabled={deletingAnnotationId === contextMenu.annotationId}
+            onClick={() => {
+              void deleteAnnotation(contextMenu.annotationId);
+              setContextMenu(null);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      )}
+
+      {annotationDetail && (() => {
+        const ann = annotations.find((a) => a.annotationId === annotationDetail.annotationId);
+        if (!ann?.comment) return null;
+        return (
+          <div
+            data-annotation-detail
+            className="fixed z-50 max-h-64 w-80 overflow-y-auto rounded-md border border-border bg-popover p-3 shadow-md"
+            style={{ top: annotationDetail.y, left: annotationDetail.x }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-foreground">{ann.comment}</p>
+          </div>
+        );
+      })()}
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Annotation</DialogTitle>
+            <DialogDescription>
+              Update the comment on this annotation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            {editingAnnotationId && (() => {
+              const ann = annotations.find((a) => a.annotationId === editingAnnotationId);
+              return ann ? (
+                <div className="max-h-32 overflow-y-auto border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                  {ann.exact}
+                </div>
+              ) : null;
+            })()}
+            <Textarea
+              value={editComment}
+              onChange={(event) => setEditComment(event.target.value)}
+              placeholder="Add or update your comment..."
+              className="min-h-28"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={() => void saveEditAnnotation()}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

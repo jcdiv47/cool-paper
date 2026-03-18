@@ -1,29 +1,25 @@
-import type { TaskType } from "@/lib/agent";
+export type ImportStage =
+  | "queued"
+  | "downloading_pdf"
+  | "downloading_source"
+  | "building_index"
+  | "generating_summary";
+
+export type ImportState =
+  | { phase: "completed" }
+  | { phase: "importing"; stage: ImportStage }
+  | { phase: "failed"; error: string };
 
 export interface PaperMetadata {
   arxivId: string;
   title: string;
   authors: string[];
   abstract: string;
+  summary?: string;
   published: string;
   categories: string[];
   addedAt: string;
-}
-
-export interface NoteFile {
-  filename: string;
-  title: string;
-  modifiedAt: string;
-  snippet?: string;
-  model?: string;
-}
-
-export interface GenerateRequest {
-  paperId: string;
-  prompt: string;
-  noteFilename: string;
-  taskType?: TaskType;
-  model?: string;
+  importState: ImportState;
 }
 
 export interface ThreadMessage {
@@ -56,15 +52,6 @@ export interface ThreadListItem {
 export interface ChatThreadListItem extends ThreadListItem {
   paperIds: string[];
   paperTitles: string[];
-}
-
-export interface RecentNote {
-  paperId: string;
-  paperTitle: string;
-  filename: string;
-  title: string;
-  modifiedAt: string;
-  model?: string;
 }
 
 export interface ChatRequest {

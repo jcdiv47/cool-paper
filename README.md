@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# cool-paper
 
 ## Getting Started
 
-First, run the development server:
+Run the web app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Run the Convex backend in a second terminal:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx convex dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## OpenRouter
 
-## Learn More
+The app uses OpenRouter as its sole LLM provider. Set the required env var in the Convex runtime:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npx convex env set OPENROUTER_API_KEY <your-openrouter-api-key>
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Optional model overrides (defaults are in `convex/lib/modelConfig.ts`):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npx convex env set MODEL_HAIKU anthropic/claude-haiku-4.5
+```
 
-## Deploy on Vercel
+The UI stores canonical OpenRouter model IDs. Runtime overrides only change the effective model used by Convex.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Notes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `OPENROUTER_HTTP_REFERER` and `OPENROUTER_APP_TITLE` are optional but recommended for OpenRouter analytics and ranking.
+- See [docs/openrouter-claude-agent-sdk.md](docs/openrouter-claude-agent-sdk.md) for full configuration details.

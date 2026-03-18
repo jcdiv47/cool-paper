@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { FileText, NotebookPen, Tag, MessageCircle } from "lucide-react";
+import { FileText, Tag, MessageCircle } from "lucide-react";
 import type { PaperMetadata } from "@/types";
 
 const CACHE_KEY = "stats-block-cache";
 
 interface CachedStats {
-  noteCount: number;
   chatCount: number;
   timestamp: number;
 }
@@ -39,23 +38,12 @@ interface StatsBlockProps {
 export function StatsBlock({ papers }: StatsBlockProps) {
   const cached = readCache();
 
-  // Use Convex queries instead of API fetches
-  const noteCounts = useQuery(api.notes.countByPapers);
   const threads = useQuery(api.threads.list);
 
-  const [noteCount, setNoteCount] = useState<number | null>(cached?.noteCount ?? null);
   const [chatCount, setChatCount] = useState<number | null>(cached?.chatCount ?? null);
 
   const paperCount = papers.length;
   const categoryCount = new Set(papers.flatMap((p) => p.categories)).size;
-
-  // Update from Convex data
-  useEffect(() => {
-    if (noteCounts !== undefined) {
-      const total = Object.values(noteCounts).reduce((sum, n) => sum + n, 0);
-      setNoteCount(total);
-    }
-  }, [noteCounts]);
 
   useEffect(() => {
     if (threads !== undefined) {
@@ -63,22 +51,21 @@ export function StatsBlock({ papers }: StatsBlockProps) {
     }
   }, [threads]);
 
-  // Persist to localStorage when both are loaded
+  // Persist to localStorage when loaded
   useEffect(() => {
-    if (noteCount !== null && chatCount !== null) {
-      writeCache({ noteCount, chatCount, timestamp: Date.now() });
+    if (chatCount !== null) {
+      writeCache({ chatCount, timestamp: Date.now() });
     }
-  }, [noteCount, chatCount]);
+  }, [chatCount]);
 
   const stats = [
     { value: paperCount, label: "Papers", icon: FileText, color: "text-primary" },
-    { value: noteCount, label: "Notes", icon: NotebookPen, color: "text-chart-3" },
     { value: categoryCount, label: "Topics", icon: Tag, color: "text-chart-2" },
     { value: chatCount, label: "Chats", icon: MessageCircle, color: "text-chart-4" },
   ];
 
   return (
-    <div className="grid shrink-0 grid-cols-2 gap-3 sm:w-72">
+    <div className="grid shrink-0 grid-cols-3 gap-3 sm:w-72">
       {stats.map((s, i) => (
         <div
           key={s.label}

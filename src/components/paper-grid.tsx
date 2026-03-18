@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
 import { PaperCard } from "./paper-card";
 import { Search, FileText, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,8 +14,6 @@ interface PaperGridProps {
 }
 
 export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
-  const noteCounts = useQuery(api.notes.countByPapers) ?? {};
-
   const filtered = useMemo(() => {
     if (!search.trim()) return papers;
     const q = search.toLowerCase();
@@ -67,7 +63,6 @@ export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
             <PaperCard
               key={paper.arxivId}
               paper={paper}
-              noteCount={noteCounts[paper.arxivId] ?? 0}
               onDelete={onDelete}
               index={i}
             />

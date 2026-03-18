@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { extractArxivId } from "@/lib/arxiv-utils";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +30,7 @@ export function AddPaperDialog({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const importPaper = useAction(api.actions.importPaper.importPaper);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,16 +40,12 @@ export function AddPaperDialog({
     setError("");
 
     try {
-      const res = await fetch("/api/papers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: input.trim() }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to add paper");
+      const arxivId = extractArxivId(input.trim());
+      if (!arxivId) {
+        throw new Error("Invalid arxiv ID or URL");
       }
+
+      await importPaper({ arxivId });
 
       setInput("");
       onOpenChange(false);
@@ -63,7 +63,7 @@ export function AddPaperDialog({
         <DialogHeader>
           <DialogTitle>Add Paper</DialogTitle>
           <DialogDescription>
-            Paste an arxiv ID or URL to download the paper
+            Paste an arxiv ID or URL to import the paper in the background
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -92,7 +92,7 @@ export function AddPaperDialog({
             </Button>
             <Button type="submit" disabled={loading || !input.trim()}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {loading ? "Downloading..." : "Add Paper"}
+              {loading ? "Starting import..." : "Add Paper"}
             </Button>
           </div>
         </form>

@@ -10,6 +10,7 @@ import { PaperPickerDialog } from "@/components/paper-picker-dialog";
 import { useConvexChat } from "@/hooks/use-convex-chat";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster, toast } from "sonner";
+import { parseImportStatus } from "@/lib/import-status";
 import type { PaperMetadata } from "@/types";
 
 function ChatSkeleton() {
@@ -49,9 +50,11 @@ export default function ActiveChatPage({
       title: p.title,
       authors: p.authors,
       abstract: p.abstract,
+      summary: p.summary,
       published: p.published,
       categories: p.categories,
       addedAt: p.addedAt,
+      importState: parseImportStatus(p.importStatus),
     }));
 
   // For new chats: read paperIds from query params
@@ -105,7 +108,7 @@ export default function ActiveChatPage({
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-background">
+      <div className="flex min-h-dvh flex-col bg-background">
         <Header fullWidth breadcrumbs={[{ label: "Chats", href: "/chat" }, { label: "..." }]}>
           <Skeleton className="h-5 w-48" />
         </Header>
@@ -115,7 +118,7 @@ export default function ActiveChatPage({
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <Toaster richColors position="bottom-right" />
       <Header
         fullWidth
@@ -127,6 +130,7 @@ export default function ActiveChatPage({
       <div className="min-h-0 flex-1">
         <LazyChatView
           messages={chat.messages}
+          streamingMessage={chat.streamingMessage}
           isStreaming={chat.isStreaming}
           isThinking={chat.isThinking}
           error={chat.error}

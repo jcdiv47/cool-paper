@@ -151,6 +151,51 @@ export const resolveAcrossSanitizedIds = query({
   },
 });
 
+export const search = query({
+  args: {
+    paperId: v.id("papers"),
+    query: v.optional(v.string()),
+    page: v.optional(v.number()),
+    section: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { paperId, query: queryText, page, section, limit = 20 }) => {
+    const paper = await ctx.db.get(paperId);
+    if (!paper?.activeIndexVersion) return [];
+
+    let chunks = await ctx.db
+      .query("paper_chunks")
+      .withIndex("by_paperId_indexVersion", (q) =>
+        q.eq("paperId", paperId).eq("indexVersion", paper.activeIndexVersion!)
+      )
+      .collect();
+
+    if (page !== undefined) {
+      chunks = chunks.filter((c) => c.page === page);
+    }
+    if (section) {
+      const sectionLower = section.toLowerCase();
+      chunks = chunks.filter(
+        (c) => c.section && c.section.toLowerCase().includes(sectionLower)
+      );
+    }
+    if (queryText) {
+      const queryLower = queryText.toLowerCase();
+      chunks = chunks.filter((c) => c.normText.includes(queryLower));
+    }
+
+    chunks.sort((a, b) => a.page - b.page || a.order - b.order);
+
+    return chunks.slice(0, limit).map((c) => ({
+      refId: c.refId,
+      page: c.page,
+      order: c.order,
+      section: c.section,
+      text: c.text,
+    }));
+  },
+});
+
 export const replaceForIndex = mutation({
   args: {
     paperId: v.id("papers"),
@@ -168,6 +213,24 @@ export const replaceForIndex = mutation({
       });
     }
 
+    return chunks.length;
+  },
+});
+
+export const appendForIndex = mutation({
+  args: {
+    paperId: v.id("papers"),
+    indexVersion: v.number(),
+    chunks: v.array(chunkInput),
+  },
+  handler: async (ctx, { paperId, indexVersion, chunks }) => {
+    for (const chunk of chunks) {
+      await ctx.db.insert("paper_chunks", {
+        paperId,
+        indexVersion,
+        ...chunk,
+      });
+    }
     return chunks.length;
   },
 });

@@ -175,6 +175,23 @@
   overflow-y: hidden;
 }
 
+/* ─── Streaming cursor ─── */
+@keyframes cursor-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.streaming-cursor > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.375rem;
+  height: 1em;
+  margin-left: 0.125rem;
+  background: color-mix(in oklch, var(--foreground) 60%, transparent);
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursor-pulse 1.2s ease-in-out infinite;
+}
+
 .citation-chip {
   display: inline-flex;
   align-items: center;
@@ -318,6 +335,21 @@
   background: color-mix(in oklch, var(--primary) 8%, var(--card));
 }
 
+/* ─── Floating note panel ─── */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-out-right {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out both;
+}
+.animate-slide-out-right {
+  animation: slide-out-right 0.2s ease-in both;
+}
 /* ─── Cal-heatmap ─── */
 .cal-heatmap-container rect:not([fill]) {
   fill: var(--secondary) !important;

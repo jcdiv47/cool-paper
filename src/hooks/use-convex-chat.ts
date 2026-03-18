@@ -1,14 +1,23 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import { useQuery, useMutation, useConvex } from "convex/react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useQuery, useMutation, useAction, useConvex } from "convex/react";
+import { useStreamingUIMessages } from "@convex-dev/agent/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { ThreadMessage } from "@/types";
 import { DEFAULT_MODEL } from "@/lib/models";
+import { parseThinkTags } from "../../convex/lib/modelConfig";
 
 export interface UseConvexChatReturn {
   messages: ThreadMessage[];
+  streamingMessage: ThreadMessage | null;
   isStreaming: boolean;
   isThinking: boolean;
   error: string | null;
@@ -28,21 +37,25 @@ export interface UseConvexChatReturn {
 
 export function useConvexChat(): UseConvexChatReturn {
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [paperIds, setPaperIds] = useState<string[]>([]);
-  const [model, setModel] = useState<string>(DEFAULT_MODEL);
-  const abortRef = useRef<AbortController | null>(null);
-  const hadPartialRef = useRef(false);
+  const [model, setModelRaw] = useState<string>(DEFAULT_MODEL);
+  const modelOverrideRef = useRef(false);
+  const abortRef = useRef(false);
+  const lastStreamRef = useRef<ThreadMessage | null>(null);
 
-  // Convex client for imperative queries
+  // Wrap setModel so user-initiated changes take priority over server sync
+  const setModel = useCallback((newModel: string) => {
+    modelOverrideRef.current = true;
+    setModelRaw(newModel);
+  }, []);
+
   const convex = useConvex();
-
-  // Convex mutations
   const createThreadMut = useMutation(api.threads.create);
   const addUserMessageMut = useMutation(api.messages.addUserMessage);
   const updatePapersMut = useMutation(api.threads.updatePapers);
+  const chatAction = useAction(api.actions.chat.sendMessage);
 
   // Subscribe to messages for current thread
   const convexMessages = useQuery(
@@ -56,48 +69,106 @@ export function useConvexChat(): UseConvexChatReturn {
     threadId ? { id: threadId as Id<"threads"> } : "skip"
   );
 
-  // Map Convex messages to ThreadMessage shape
-  const messages: ThreadMessage[] = (convexMessages ?? []).map((m) => ({
-    role: m.role,
-    content: m.content,
-    thinking: m.thinking,
-    timestamp: m.timestamp,
-    model: m.model,
-  }));
+  const agentThreadId = convexThread?.agentThreadId;
 
-  // Detect streaming state from partial messages.
-  // Only turn off streaming after we've seen a partial message get finalized —
-  // otherwise the effect fires prematurely when the user message arrives but
-  // the assistant partial hasn't been created yet.
-  useEffect(() => {
+  // Subscribe to streaming deltas from the agent component
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const streamingUIMessages = useStreamingUIMessages(
+    api.agentStreams.getStreams as any,
+    agentThreadId && isStreaming ? { threadId: agentThreadId } : "skip",
+  );
+
+  const messages = useMemo<ThreadMessage[]>(
+    () =>
+      (convexMessages ?? [])
+        .filter((m) => !m.isPartial)
+        .map((m) => ({
+          role: m.role,
+          content: m.content,
+          thinking: m.thinking,
+          timestamp: m.timestamp,
+          model: m.model,
+        })),
+    [convexMessages]
+  );
+
+  // Build streaming message from agent UIMessages (real-time text + thinking)
+  const streamingMessage = useMemo<ThreadMessage | null>(() => {
     if (!isStreaming) {
-      hadPartialRef.current = false;
-      return;
+      lastStreamRef.current = null;
+      return null;
     }
-    if (!convexMessages) return;
-    const hasPartial = convexMessages.some(
-      (m) => m.role === "assistant" && m.isPartial === true
-    );
-    if (hasPartial) {
-      hadPartialRef.current = true;
-      // Once the partial message has visible content, the model has moved
-      // past the thinking phase into content generation.
-      if (isThinking) {
-        const partial = convexMessages.find(
-          (m) => m.role === "assistant" && m.isPartial === true
-        );
-        if (partial && partial.content) {
-          setIsThinking(false);
+
+    if (streamingUIMessages?.length) {
+      // Find the last assistant message in the stream
+      const assistantMsgs = streamingUIMessages.filter(
+        (m) => m.role === "assistant"
+      );
+      const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+
+      if (lastAssistant) {
+        let rawText = "";
+        let structuredThinking = "";
+
+        for (const part of lastAssistant.parts) {
+          if (part.type === "text") {
+            rawText += (part as { type: "text"; text: string }).text;
+          } else if (part.type === "reasoning") {
+            const rp = part as { type: "reasoning"; text: string };
+            structuredThinking += (structuredThinking ? "\n" : "") + rp.text;
+          }
         }
+
+        // Parse <think> tags from text (Qwen, DeepSeek, etc.)
+        const { thinking: tagThinking, content: cleanText } =
+          parseThinkTags(rawText);
+
+        const msg: ThreadMessage = {
+          role: "assistant",
+          content: cleanText,
+          thinking: structuredThinking || tagThinking || undefined,
+          timestamp: new Date().toISOString(),
+          model,
+        };
+
+        lastStreamRef.current = msg;
+        return msg;
       }
     }
-    if (!hasPartial && hadPartialRef.current) {
-      // Partial was present before but now finalized
-      setIsStreaming(false);
-      setIsThinking(false);
-      hadPartialRef.current = false;
+
+    // Use last known content (bridges gap between stream end and message save)
+    // or show empty placeholder while waiting for first deltas
+    return lastStreamRef.current ?? {
+      role: "assistant",
+      content: "",
+      timestamp: new Date().toISOString(),
+      model,
+    };
+  }, [isStreaming, streamingUIMessages, model]);
+
+  // Derive isThinking from streaming content:
+  // true when streaming but no text content has appeared yet
+  const isThinking = useMemo(() => {
+    if (!isStreaming) return false;
+    if (!streamingUIMessages?.length) return true;
+
+    const assistantMsgs = streamingUIMessages.filter(
+      (m) => m.role === "assistant"
+    );
+    const lastAssistant = assistantMsgs[assistantMsgs.length - 1];
+    if (!lastAssistant) return true;
+
+    // Collect raw text from all text parts
+    let rawText = "";
+    for (const p of lastAssistant.parts) {
+      if (p.type === "text") {
+        rawText += (p as { type: "text"; text: string }).text;
+      }
     }
-  }, [convexMessages, isStreaming]);
+    // Strip <think> tags — the remaining content is "real" text
+    const { content } = parseThinkTags(rawText);
+    return !content;
+  }, [isStreaming, streamingUIMessages]);
 
   const createThread = useCallback(
     async (pIds: string[]): Promise<string> => {
@@ -119,13 +190,10 @@ export function useConvexChat(): UseConvexChatReturn {
   const loadThread = useCallback(
     async (id: string) => {
       setError(null);
-      // Verify the thread exists before subscribing
       const thread = await convex.query(api.threads.get, {
         id: id as Id<"threads">,
       });
-      if (!thread) {
-        throw new Error("Thread not found");
-      }
+      if (!thread) throw new Error("Thread not found");
       setThreadId(id);
     },
     [convex]
@@ -135,15 +203,25 @@ export function useConvexChat(): UseConvexChatReturn {
   useEffect(() => {
     if (convexThread) {
       setPaperIds(convexThread.paperIds);
-      if (convexThread.model) setModel(convexThread.model);
+      if (convexThread.model && !modelOverrideRef.current) {
+        setModelRaw(convexThread.model);
+      }
     }
   }, [convexThread]);
+
+  // Clear override once streaming finishes (server now has the correct model)
+  useEffect(() => {
+    if (!isStreaming) {
+      modelOverrideRef.current = false;
+    }
+  }, [isStreaming]);
 
   const clearThread = useCallback(() => {
     setThreadId(null);
     setPaperIds([]);
     setError(null);
-    setModel(DEFAULT_MODEL);
+    modelOverrideRef.current = false;
+    setModelRaw(DEFAULT_MODEL);
   }, []);
 
   const addPaper = useCallback(
@@ -202,46 +280,42 @@ export function useConvexChat(): UseConvexChatReturn {
       });
 
       setIsStreaming(true);
-      setIsThinking(true);
-
-      abortRef.current = new AbortController();
+      abortRef.current = false;
 
       try {
-        // Call the API route which runs the agent and writes partial messages to Convex
-        const res = await fetch(
-          `/api/threads/${activeThreadId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: content.trim(), model }),
-            signal: abortRef.current.signal,
-          }
-        );
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: "Request failed" }));
-          setError(err.error || "Failed to send message");
-        }
+        // Call the Convex action which runs the agent with streaming
+        await chatAction({
+          threadId: activeThreadId as Id<"threads">,
+          message: content.trim(),
+          model,
+        });
       } catch (e) {
-        if (e instanceof Error && e.name !== "AbortError") {
-          setError(e.message);
+        if (!abortRef.current) {
+          setError(e instanceof Error ? e.message : "Failed to send message");
         }
       } finally {
         setIsStreaming(false);
-        setIsThinking(false);
       }
     },
-    [threadId, paperIds, isStreaming, model, createThread, addUserMessageMut]
+    [
+      threadId,
+      paperIds,
+      isStreaming,
+      model,
+      createThread,
+      addUserMessageMut,
+      chatAction,
+    ]
   );
 
   const cancelStream = useCallback(() => {
-    abortRef.current?.abort();
+    abortRef.current = true;
     setIsStreaming(false);
-    setIsThinking(false);
   }, []);
 
   return {
     messages,
+    streamingMessage,
     isStreaming,
     isThinking,
     error,

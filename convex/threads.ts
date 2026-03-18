@@ -56,6 +56,22 @@ export const get = query({
   },
 });
 
+export const getByPaperId = query({
+  args: { paperId: v.string() },
+  handler: async (ctx, { paperId }) => {
+    const threads = await ctx.db
+      .query("threads")
+      .withIndex("by_updatedAt")
+      .order("desc")
+      .collect();
+    return (
+      threads.find(
+        (t) => t.paperIds.length === 1 && t.paperIds[0] === paperId
+      ) ?? null
+    );
+  },
+});
+
 export const create = mutation({
   args: {
     title: v.string(),
@@ -111,6 +127,16 @@ export const updateTitle = mutation({
   args: { id: v.id("threads"), title: v.string() },
   handler: async (ctx, { id, title }) => {
     await ctx.db.patch(id, { title });
+  },
+});
+
+export const updateAgentThread = mutation({
+  args: {
+    id: v.id("threads"),
+    agentThreadId: v.string(),
+  },
+  handler: async (ctx, { id, agentThreadId }) => {
+    await ctx.db.patch(id, { agentThreadId });
   },
 });
 

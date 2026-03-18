@@ -22,7 +22,7 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: "Cool Paper",
-  description: "Immersive arxiv paper reader with AI-generated notes",
+  description: "Immersive arxiv paper reader",
 };
 
 export default function RootLayout({

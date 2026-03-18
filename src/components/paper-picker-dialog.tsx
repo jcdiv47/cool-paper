@@ -11,7 +11,8 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import { Check } from "lucide-react";
+import { Check, Loader2, AlertTriangle } from "lucide-react";
+import { parseImportStatus, stageLabel } from "@/lib/import-status";
 import type { PaperMetadata } from "@/types";
 
 interface PaperPickerDialogProps {
@@ -40,9 +41,11 @@ export function PaperPickerDialog({
     title: p.title,
     authors: p.authors,
     abstract: p.abstract,
+    summary: p.summary,
     published: p.published,
     categories: p.categories,
     addedAt: p.addedAt,
+    importState: parseImportStatus(p.importStatus),
   }));
 
   useEffect(() => {
@@ -126,9 +129,23 @@ export function PaperPickerDialog({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-tight line-clamp-2">
-                        {paper.title}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium leading-tight line-clamp-2">
+                          {paper.title}
+                        </p>
+                        {paper.importState.phase === "importing" && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                            {stageLabel(paper.importState.stage)}
+                          </span>
+                        )}
+                        {paper.importState.phase === "failed" && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            Failed
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-xs text-muted-foreground/60 truncate">
                         {paper.authors.slice(0, 3).join(", ")}
                         {paper.authors.length > 3 ? " et al." : ""}
