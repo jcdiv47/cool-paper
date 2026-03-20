@@ -268,7 +268,11 @@ export default function PaperPage({
             chatOpen={chatOpen}
           />
         ) : (
-          <SummaryView paper={paper} onViewPdf={() => updateUrl({ view: "pdf" })} />
+          <SummaryView
+            paper={paper}
+            onViewPdf={() => updateUrl({ view: "pdf" })}
+            onNavigate={handleCitationNavigate}
+          />
         )}
       </main>
 

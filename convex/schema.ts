@@ -2,6 +2,11 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { normalizedModelMetadataEntryValidator } from "./lib/openRouterModels";
 
+const sectionOutlineEntryValidator = v.object({
+  title: v.string(),
+  startPage: v.number(),
+});
+
 export default defineSchema({
   papers: defineTable({
     arxivId: v.string(),
@@ -86,6 +91,7 @@ export default defineSchema({
     version: v.number(),
     extractorVersion: v.string(),
     createdAt: v.string(),
+    sectionOutline: v.optional(v.array(sectionOutlineEntryValidator)),
   })
     .index("by_paperId", ["paperId"])
     .index("by_paperId_version", ["paperId", "version"]),

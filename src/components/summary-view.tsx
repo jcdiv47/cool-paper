@@ -1,63 +1,67 @@
 "use client";
 
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeHighlight from "rehype-highlight";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
-import { FileText } from "lucide-react";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
+import { FileText, MessageCircle } from "lucide-react";
+import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { CitationMarkdown, type CitationTarget } from "@/components/citation-markdown";
+import { parseCitationTokens } from "@/lib/citations";
 import type { PaperMetadata } from "@/types";
 
 interface SummaryViewProps {
   paper: PaperMetadata;
   compact?: boolean;
   onViewPdf?: () => void;
+  onNavigate?: (href: string) => void;
 }
 
-export function SummaryView({ paper, compact = false, onViewPdf }: SummaryViewProps) {
-  const summary = paper.summary?.trim();
-
-  if (summary) {
-    return (
-      <div className="flex h-full flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-          <article
-            className={
-              compact
-                ? "prose prose-zinc prose-sm mx-auto max-w-3xl px-5 py-6 sm:px-6 sm:py-7 dark:prose-invert"
-                : "prose prose-zinc mx-auto max-w-4xl px-6 py-10 sm:px-10 sm:py-14 dark:prose-invert"
-            }
-          >
-            {onViewPdf && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="not-prose mb-6 gap-1.5"
-                onClick={onViewPdf}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                View PDF
-              </Button>
-            )}
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[
-                rehypeHighlight,
-                [rehypeKatex, { throwOnError: false }] as [
-                  typeof rehypeKatex,
-                  { throwOnError: boolean },
-                ],
-              ]}
-            >
-              {summary}
-            </ReactMarkdown>
-          </article>
-        </div>
-      </div>
-    );
-  }
+export function SummaryView({
+  paper,
+  compact = false,
+  onViewPdf,
+  onNavigate,
+}: SummaryViewProps) {
+  const router = useRouter();
+  const summary = useMemo(() => {
+    const raw = paper.summary?.trim();
+    if (!raw) return raw;
+    // Strip legacy prelude (title/authors/abstract) that was prepended before
+    // the UI started rendering metadata directly from paper fields.
+    const guideStart = raw.indexOf("## Reading Guide");
+    if (guideStart > 0) return raw.slice(guideStart).trim();
+    return raw;
+  }, [paper.summary]);
+  const sanitizedId = paper.arxivId.replace(/\//g, "_");
+  const citationRefIds = useMemo(
+    () => (summary ? [...new Set(parseCitationTokens(summary).map((token) => token.refId))] : []),
+    [summary],
+  );
+  const citationTargetsResult = useQuery(
+    api.paperChunks.resolveBySanitizedId,
+    citationRefIds.length > 0
+      ? {
+          sanitizedId,
+          refIds: citationRefIds,
+        }
+      : "skip",
+  );
+  const citationTargets = useMemo<Record<string, CitationTarget>>(
+    () =>
+      Object.fromEntries(
+        (citationTargetsResult ?? []).map((chunk) => [
+          chunk.refId,
+          {
+            refId: chunk.refId,
+            page: chunk.page,
+            sanitizedId: chunk.sanitizedId,
+            section: chunk.section,
+          },
+        ]),
+      ),
+    [citationTargetsResult],
+  );
 
   const publishedDate = new Date(paper.published);
   const formattedDate = publishedDate.toLocaleDateString("en-US", {
@@ -66,27 +70,17 @@ export function SummaryView({ paper, compact = false, onViewPdf }: SummaryViewPr
     day: "numeric",
   });
 
+
+
+  const containerCls = compact
+    ? "mx-auto max-w-3xl px-5 py-6 sm:px-6 sm:py-7"
+    : "mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-14";
+
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        <div
-          className={
-            compact
-              ? "mx-auto max-w-3xl px-5 py-6 sm:px-6 sm:py-7"
-              : "mx-auto max-w-4xl px-6 py-10 sm:px-10 sm:py-14"
-          }
-        >
-          {onViewPdf && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="mb-6 gap-1.5"
-              onClick={onViewPdf}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              View PDF
-            </Button>
-          )}
+        <div className={containerCls}>
+          {/* Paper metadata — always visible */}
           <h1
             className={
               compact
@@ -96,8 +90,10 @@ export function SummaryView({ paper, compact = false, onViewPdf }: SummaryViewPr
           >
             {paper.title}
           </h1>
-          <div className="mt-5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
+
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
             <time className="font-mono">{formattedDate}</time>
+            <span className="font-mono">{paper.arxivId}</span>
             {paper.categories.map((cat) => (
               <span
                 key={cat}
@@ -106,30 +102,70 @@ export function SummaryView({ paper, compact = false, onViewPdf }: SummaryViewPr
                 {cat}
               </span>
             ))}
+            <div className="ml-auto flex items-center gap-1.5">
+              {onViewPdf && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 gap-1 px-2 text-[10px]"
+                  onClick={onViewPdf}
+                >
+                  <FileText className="h-3 w-3" />
+                  PDF
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 gap-1 px-2 text-[10px]"
+                onClick={() => router.push(`/chat/new?paperIds=${sanitizedId}`)}
+              >
+                <MessageCircle className="h-3 w-3" />
+                New Chat
+              </Button>
+            </div>
           </div>
+
           <div className={compact ? "my-6 h-px bg-border" : "my-8 h-px bg-border"} />
-          <div className={compact ? "mb-8" : "mb-10"}>
-            <p className="text-sm leading-relaxed text-muted-foreground/70">
-              {paper.authors.join(", ")}
-            </p>
-          </div>
-          <div>
-            <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/50">
-              Abstract
-            </h2>
-            <p
+
+          {/* Abstract */}
+          {paper.abstract && (
+            <div className={summary ? (compact ? "mb-6" : "mb-8") : undefined}>
+              <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/50">
+                Abstract
+              </h2>
+              <p
+                className={
+                  compact
+                    ? "font-serif text-[1rem] leading-[1.8] text-foreground/85"
+                    : "font-serif text-[1.05rem] leading-[1.85] text-foreground/85 sm:text-lg sm:leading-[1.9]"
+                }
+              >
+                {paper.abstract}
+              </p>
+            </div>
+          )}
+
+          {/* Summary */}
+          {summary ? (
+            <article
               className={
                 compact
-                  ? "font-serif text-[1rem] leading-[1.8] text-foreground/85"
-                  : "font-serif text-[1.05rem] leading-[1.85] text-foreground/85 sm:text-lg sm:leading-[1.9]"
+                  ? "prose prose-sm prose-summary max-w-none dark:prose-invert"
+                  : "prose prose-lg prose-summary max-w-none dark:prose-invert"
               }
             >
-              {paper.abstract}
-            </p>
+              <CitationMarkdown
+                content={summary}
+                targets={citationTargets}
+                onNavigate={onNavigate}
+              />
+            </article>
+          ) : (
             <p className="mt-4 text-sm text-muted-foreground">
               Guided summary is being generated.
             </p>
-          </div>
+          )}
         </div>
       </div>
     </div>

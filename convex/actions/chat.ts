@@ -4,11 +4,15 @@ import { action, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { api } from "../_generated/api";
 import {
+  annotationRules,
+  citationRules,
+  draftOutputRules,
+  draftWorkflow,
+  groundingWorkflow,
   paperAgent,
+  paperGroundingAgent,
   resolveModel,
   toolWorkflow,
-  citationRules,
-  annotationRules,
 } from "../agents/paper";
 import { stepCountIs } from "@convex-dev/agent";
 import {
@@ -16,34 +20,19 @@ import {
   validateCitations,
   type CitationResolutionResult,
 } from "../lib/citations";
+import {
+  detectSourceFileLeaks,
+  parseDraftAnswer,
+  stripUnsafeContent,
+  type DraftAnswer,
+  type DraftClaim,
+} from "../lib/grounding";
 import { parseThinkTags } from "../lib/modelConfig";
-import type { Id, Doc } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
-type StreamTextOptions = Parameters<typeof paperAgent.streamText>[2];
-
-interface AgentStreamResult {
-  text: Promise<string>;
-  reasoning: Promise<unknown>;
-}
-
-function extractStructuredThinking(reasoning: unknown): string | undefined {
-  if (!reasoning) return undefined;
-  if (typeof reasoning === "string") return reasoning || undefined;
-  if (Array.isArray(reasoning)) {
-    const parts = reasoning.flatMap((entry) => {
-      if (typeof entry !== "object" || entry === null) return [];
-      const part = entry as { type?: unknown; text?: unknown };
-      if (
-        (part.type === "reasoning" || part.type === "text") &&
-        typeof part.text === "string"
-      ) {
-        return [part.text];
-      }
-      return [];
-    });
-    return parts.join("\n") || undefined;
-  }
-  return undefined;
+function cleanModelText(text?: string): string {
+  if (!text) return "";
+  return parseThinkTags(text).content.trim();
 }
 
 function generateThreadTitle(message: string): string {
@@ -52,21 +41,6 @@ function generateThreadTitle(message: string): string {
   const truncated = cleaned.slice(0, 60);
   const lastSpace = truncated.lastIndexOf(" ");
   return (lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated) + "\u2026";
-}
-
-async function extractAssistantResponse(
-  result: AgentStreamResult,
-): Promise<{ text: string; thinking?: string }> {
-  const assistantText = await result.text;
-  const reasoningData = await result.reasoning;
-  const structuredThinking = extractStructuredThinking(reasoningData);
-  const { thinking: tagThinking, content: cleanText } =
-    parseThinkTags(assistantText);
-
-  return {
-    text: cleanText,
-    thinking: structuredThinking || tagThinking || undefined,
-  };
 }
 
 async function validateAssistantCitations(
@@ -100,51 +74,60 @@ async function validateAssistantCitations(
   return validateCitations(chunkResolutions, content, true);
 }
 
-function buildChatSystemPrompt(
+async function listSourcePathsForPapers(
+  ctx: ActionCtx,
   papers: Doc<"papers">[],
-  annotationsByPaper: Map<string, Doc<"annotations">[]>,
-): string {
-  if (papers.length === 1) {
-    const paper = papers[0]!;
-    const annotations = annotationsByPaper.get(String(paper._id)) ?? [];
-    const annotBlock = formatAnnotationBlock(annotations);
-    return `You are an expert academic paper analyst discussing a paper with the user.
+): Promise<string[]> {
+  const fileLists = (await Promise.all(
+    papers.map((paper) =>
+      ctx.runQuery(api.paperSourceFiles.listByPaper, {
+        paperId: paper._id,
+      }),
+    ),
+  )) as { relativePath: string }[][];
 
-Title: ${paper.title}
-Abstract: ${paper.abstract}
-
-Pass paperId="${paper._id}" to all tools.
-${annotBlock}
-
-${toolWorkflow()}
-
-${citationRules()}
-${annotationRules()}`;
+  const relativePaths: string[] = [];
+  for (const files of fileLists) {
+    for (const file of files) {
+      relativePaths.push(file.relativePath);
+    }
   }
 
-  const papersBlock = papers
-    .map((p) => {
-      const annotations = annotationsByPaper.get(String(p._id)) ?? [];
-      const annotBlock = formatAnnotationBlock(annotations);
-      return `Paper: "${p.title}"
-  Abstract: ${p.abstract.slice(0, 300)}${p.abstract.length > 300 ? "…" : ""}
-  paperId: ${p._id}
-  ${annotBlock}`;
-    })
-    .join("\n\n");
+  return [...new Set(relativePaths)];
+}
 
-  return `You are an expert academic paper analyst discussing papers with the user.
+function buildConversationBlock(messages: Doc<"messages">[]): string {
+  const recent = messages.slice(-10);
+  if (recent.length === 0) return "Conversation so far: none.";
 
-Papers in this conversation:
-${papersBlock}
+  const lines = recent.map((entry) => {
+    const role = entry.role === "assistant" ? "Assistant" : "User";
+    const content =
+      entry.content.length > 1000
+        ? `${entry.content.slice(0, 1000)}…`
+        : entry.content;
+    return `${role}: ${content}`;
+  });
 
-Call searchEvidence with each paper's paperId to gather citable evidence before responding.
-Example: The authors of "Attention Is All You Need" propose the Transformer architecture [[cite:1706_03762_p003_a8f29bc012]].
+  return `Conversation so far:\n${lines.join("\n\n")}`;
+}
 
-${toolWorkflow()}
+function buildPaperContextBlock(papers: Doc<"papers">[]): string {
+  if (papers.length === 1) {
+    const paper = papers[0]!;
+    return `Paper:
+Title: ${paper.title}
+Abstract: ${paper.abstract}
+paperId: ${paper._id}`;
+  }
 
-${citationRules()}
-${annotationRules()}`;
+  return `Papers:\n${papers
+    .map(
+      (paper) => `- "${paper.title}"
+  paperId: ${paper._id}
+  Abstract: ${paper.abstract.slice(0, 400)}${paper.abstract.length > 400 ? "…" : ""}`,
+    )
+    .join("\n\n")}`;
 }
 
 function formatAnnotationBlock(annotations: Doc<"annotations">[]): string {
@@ -152,11 +135,13 @@ function formatAnnotationBlock(annotations: Doc<"annotations">[]): string {
 
   const entries = annotations
     .slice(0, 24)
-    .map((a) => {
+    .map((annotation) => {
       const excerpt =
-        a.exact.length > 220 ? `${a.exact.slice(0, 220)}…` : a.exact;
-      const comment = a.comment?.trim();
-      return `- [[annot:${a._id}]] ${a.kind} on page ${a.page}
+        annotation.exact.length > 220
+          ? `${annotation.exact.slice(0, 220)}…`
+          : annotation.exact;
+      const comment = annotation.comment?.trim();
+      return `- [[annot:${annotation._id}]] ${annotation.kind} on page ${annotation.page}
   Excerpt: "${excerpt}"
   ${comment ? `Comment: "${comment}"` : "Comment: none"}`;
     })
@@ -165,18 +150,316 @@ function formatAnnotationBlock(annotations: Doc<"annotations">[]): string {
   return `Saved user annotations:\n${entries}`;
 }
 
+function buildAnnotationContext(
+  papers: Doc<"papers">[],
+  annotationsByPaper: Map<string, Doc<"annotations">[]>,
+): string {
+  return papers
+    .map((paper) => {
+      const annotations = annotationsByPaper.get(String(paper._id)) ?? [];
+      return `Annotations for paperId ${paper._id}:\n${formatAnnotationBlock(annotations)}`;
+    })
+    .join("\n\n");
+}
+
+function buildDraftSchemaPrompt() {
+  return `Return strict JSON matching this shape:
+{
+  "lead": "optional short opening paragraph",
+  "claims": [
+    {
+      "id": "claim_1",
+      "section": "optional section label",
+      "paperId": "paper id for the claim",
+      "text": "one atomic factual sentence",
+      "groundingQueries": ["1 to 3 short PDF search queries"],
+      "optional": false
+    }
+  ],
+  "closing": "optional short closing paragraph"
+}
+
+Rules:
+- Claims must be atomic.
+- Claims must omit inline citations.
+- groundingQueries should reuse paper terminology likely to appear verbatim in the PDF.
+- Set paperId on every claim when multiple papers are in scope.`;
+}
+
+function buildChatDraftSystemPrompt(
+  papers: Doc<"papers">[],
+  annotationsByPaper: Map<string, Doc<"annotations">[]>,
+): string {
+  return `You are preparing an internal structured draft for a user-facing grounded response.
+
+${buildPaperContextBlock(papers)}
+
+${buildAnnotationContext(papers, annotationsByPaper)}
+
+${toolWorkflow()}
+${draftWorkflow()}
+${draftOutputRules()}
+${annotationRules()}
+
+${buildDraftSchemaPrompt()}`;
+}
+
+function buildChatDraftPrompt(
+  messages: Doc<"messages">[],
+  message: string,
+): string {
+  return `${buildConversationBlock(messages)}
+
+Latest user request:
+${message}
+
+Produce the JSON draft now.`;
+}
+
+function buildGroundingSystemPrompt(papers: Doc<"papers">[]): string {
+  return `You are preparing the final user-visible answer from a structured draft.
+
+${buildPaperContextBlock(papers)}
+
+${groundingWorkflow()}
+${citationRules()}
+
+Output markdown only.
+- Preserve the substance of the draft, but only keep claims you can ground to PDF evidence.
+- Every retained factual sentence must include at least one valid inline citation token.
+- Never mention TeX source file names, source paths, or tool names.
+- If needed, briefly qualify that some details could not be grounded in the PDF.`;
+}
+
+function buildGroundingPrompt(draft: DraftAnswer): string {
+  return `Here is the structured draft to ground to PDF evidence:
+
+\`\`\`json
+${JSON.stringify(draft, null, 2)}
+\`\`\`
+
+Write the final cited markdown answer now.`;
+}
+
+function buildRepairPrompt(
+  draft: DraftAnswer,
+  invalidText: string,
+  issues: string[],
+): string {
+  return `The previous grounded answer was invalid.
+
+Validation issues:
+${issues.map((issue) => `- ${issue}`).join("\n")}
+
+Invalid answer:
+
+${invalidText}
+
+Original draft:
+
+\`\`\`json
+${JSON.stringify(draft, null, 2)}
+\`\`\`
+
+Rewrite the final markdown so that every factual claim has valid PDF citations, and no TeX filenames or source paths appear.`;
+}
+
+function fallbackDraftAnswer(
+  rawText: string,
+  defaultPaperId?: string,
+): DraftAnswer {
+  const cleaned = cleanModelText(rawText)
+    .replace(/\s+/g, " ")
+    .trim();
+  const sentenceMatches = cleaned.match(/[^.!?]+[.!?]?/g) ?? [];
+  const claims: DraftClaim[] = sentenceMatches
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((sentence, index) => ({
+      id: `claim_${index + 1}`,
+      text: sentence,
+      groundingQueries: [sentence.slice(0, 220)],
+      optional: false,
+      paperId: defaultPaperId,
+    }));
+
+  return {
+    claims,
+  };
+}
+
+async function runDraftPass(
+  ctx: ActionCtx,
+  papers: Doc<"papers">[],
+  annotationsByPaper: Map<string, Doc<"annotations">[]>,
+  messages: Doc<"messages">[],
+  message: string,
+  languageModel: ReturnType<typeof resolveModel>,
+): Promise<DraftAnswer> {
+  const { threadId } = await paperAgent.createThread(ctx, {});
+  const defaultPaperId =
+    papers.length === 1 ? String(papers[0]!._id) : undefined;
+  const systemPrompt = buildChatDraftSystemPrompt(papers, annotationsByPaper);
+
+  const firstPass = await paperAgent.generateText(
+    ctx,
+    { threadId },
+    {
+      system: systemPrompt,
+      prompt: buildChatDraftPrompt(messages, message),
+      model: languageModel,
+      stopWhen: stepCountIs(16),
+    },
+  );
+
+  const firstText = cleanModelText(firstPass.text);
+  const parsedFirst = parseDraftAnswer(firstText, defaultPaperId);
+  if (parsedFirst) {
+    return parsedFirst;
+  }
+
+  const repair = await paperAgent.generateText(
+    ctx,
+    { threadId },
+    {
+      system: systemPrompt,
+      prompt:
+        "Rewrite your previous work as strict JSON matching the required schema. Return JSON only and do not call more tools.",
+      model: languageModel,
+      tools: {},
+    },
+  );
+
+  const repaired = parseDraftAnswer(cleanModelText(repair.text), defaultPaperId);
+  return repaired ?? fallbackDraftAnswer(firstText || cleanModelText(repair.text), defaultPaperId);
+}
+
+interface FinalValidation {
+  citationValidation: CitationResolutionResult;
+  sourceLeaks: ReturnType<typeof detectSourceFileLeaks>;
+  issues: string[];
+  isValid: boolean;
+}
+
+async function validateFinalAnswer(
+  ctx: ActionCtx,
+  papers: Doc<"papers">[],
+  sourcePaths: string[],
+  content: string,
+): Promise<FinalValidation> {
+  const citationValidation = await validateAssistantCitations(ctx, papers, content);
+  const sourceLeaks = detectSourceFileLeaks(content, sourcePaths);
+  const issues: string[] = [];
+
+  if (citationValidation.missingRequiredCitations) {
+    issues.push("Missing required PDF citations.");
+  }
+  if (citationValidation.invalidRefIds.length > 0) {
+    issues.push(
+      `Invalid citation refIds: ${citationValidation.invalidRefIds.join(", ")}`,
+    );
+  }
+  if (citationValidation.ambiguousRefIds.length > 0) {
+    issues.push(
+      `Ambiguous citation refIds: ${citationValidation.ambiguousRefIds.join(", ")}`,
+    );
+  }
+  if (sourceLeaks.exactPaths.length > 0) {
+    issues.push(`Source file path leak: ${sourceLeaks.exactPaths.join(", ")}`);
+  }
+  if (sourceLeaks.genericPaths.length > 0) {
+    issues.push(`Generic TeX path leak: ${sourceLeaks.genericPaths.join(", ")}`);
+  }
+  if (sourceLeaks.malformedCitationTokens.length > 0) {
+    issues.push(
+      `Malformed citation tokens: ${sourceLeaks.malformedCitationTokens.join(", ")}`,
+    );
+  }
+
+  return {
+    citationValidation,
+    sourceLeaks,
+    issues,
+    isValid: issues.length === 0,
+  };
+}
+
+async function runGroundingPass(
+  ctx: ActionCtx,
+  threadId: Id<"threads">,
+  papers: Doc<"papers">[],
+  draft: DraftAnswer,
+  languageModel: ReturnType<typeof resolveModel>,
+): Promise<string> {
+  const { threadId: groundingThreadId } = await paperGroundingAgent.createThread(
+    ctx,
+    {},
+  );
+  await ctx.runMutation(api.threads.updateAgentThread, {
+    id: threadId,
+    agentThreadId: groundingThreadId,
+  });
+
+  const result = await paperGroundingAgent.streamText(
+    ctx,
+    { threadId: groundingThreadId },
+    {
+      system: buildGroundingSystemPrompt(papers),
+      prompt: buildGroundingPrompt(draft),
+      model: languageModel,
+      stopWhen: stepCountIs(16),
+    },
+    { saveStreamDeltas: true },
+  );
+
+  return cleanModelText(await result.text);
+}
+
+async function runRepairPass(
+  ctx: ActionCtx,
+  userThreadId: Id<"threads">,
+  papers: Doc<"papers">[],
+  draft: DraftAnswer,
+  invalidText: string,
+  issues: string[],
+  languageModel: ReturnType<typeof resolveModel>,
+): Promise<string> {
+  const { threadId } = await paperGroundingAgent.createThread(ctx, {});
+  // Point the user-facing thread at the repair agent thread so the client
+  // can subscribe to streaming deltas for this pass too.
+  await ctx.runMutation(api.threads.updateAgentThread, {
+    id: userThreadId,
+    agentThreadId: threadId,
+  });
+  const result = await paperGroundingAgent.streamText(
+    ctx,
+    { threadId },
+    {
+      system: buildGroundingSystemPrompt(papers),
+      prompt: buildRepairPrompt(draft, invalidText, issues),
+      model: languageModel,
+      tools: {},
+    },
+    { saveStreamDeltas: true },
+  );
+
+  return cleanModelText(await result.text);
+}
+
 export const sendMessage = action({
   args: {
     threadId: v.id("threads"),
     message: v.string(),
     model: v.optional(v.string()),
   },
-  handler: async (ctx, { threadId, message, model }): Promise<{ text: string; messageId: string }> => {
-    // Load thread
+  handler: async (
+    ctx,
+    { threadId, message, model },
+  ): Promise<{ text: string; messageId: string }> => {
     const thread = await ctx.runQuery(api.threads.get, { id: threadId });
     if (!thread) throw new Error("Thread not found");
 
-    // Load all papers for this thread
     const papers: Doc<"papers">[] = [];
     const annotationsByPaper = new Map<string, Doc<"annotations">[]>();
     for (const pid of thread.paperIds) {
@@ -193,11 +476,12 @@ export const sendMessage = action({
       throw new Error("No valid papers found for this thread");
     }
 
-    // Update title on first message
     const existingMessages = await ctx.runQuery(api.messages.listByThread, {
       threadId,
     });
-    const userMessages = existingMessages.filter((m: { role: string }) => m.role === "user");
+    const userMessages = existingMessages.filter(
+      (entry: { role: string }) => entry.role === "user",
+    );
     if (userMessages.length <= 1) {
       await ctx.runMutation(api.threads.updateTitle, {
         id: threadId,
@@ -205,76 +489,87 @@ export const sendMessage = action({
       });
     }
 
-    // Get or create agent thread
-    let agentThreadId = thread.agentThreadId;
-    if (!agentThreadId) {
-      const { threadId: newAgentThread } = await paperAgent.createThread(ctx, {});
-      agentThreadId = newAgentThread;
-      await ctx.runMutation(api.threads.updateAgentThread, {
-        id: threadId,
-        agentThreadId,
-      });
-    }
-
-    // Build system prompt with paper context
-    const systemPrompt = buildChatSystemPrompt(papers, annotationsByPaper);
-
-    // Choose model
     const languageModel = resolveModel(model);
+    const sourcePaths = await listSourcePathsForPapers(ctx, papers);
 
-    // Stream response using agent (deltas saved to DB for real-time UI)
-    const result = await paperAgent.streamText(
-      ctx,
-      { threadId: agentThreadId },
-      {
-        system: systemPrompt,
-        prompt: message,
-        model: languageModel,
-        stopWhen: stepCountIs(16),
-      } as StreamTextOptions,
-      { saveStreamDeltas: true },
-    );
-
-    // Wait for the stream to complete
-    let { text: assistantText, thinking } =
-      await extractAssistantResponse(result);
-
-    // If the model exhausted all steps on tool calls without producing
-    // final text, do a follow-up call with no tools to force text output.
-    if (!assistantText?.trim()) {
-      const followUp = await paperAgent.streamText(
-        ctx,
-        { threadId: agentThreadId },
-        {
-          system: systemPrompt,
-          prompt:
-            "Based on all the evidence and source files you have gathered above, now write your response. Do not call any more tools.",
-          model: languageModel,
-          tools: {},
-        } as StreamTextOptions,
-        { saveStreamDeltas: true },
-      );
-      const followUpResponse = await extractAssistantResponse(followUp);
-      assistantText = followUpResponse.text;
-      thinking = thinking || followUpResponse.thinking;
-    }
-
-    if (!assistantText?.trim()) {
-      throw new Error("Assistant returned an empty response");
-    }
-
-    const citationValidation = await validateAssistantCitations(
+    const draft = await runDraftPass(
       ctx,
       papers,
+      annotationsByPaper,
+      existingMessages,
+      message,
+      languageModel,
+    );
+
+    let assistantText = await runGroundingPass(
+      ctx,
+      threadId,
+      papers,
+      draft,
+      languageModel,
+    );
+
+    let finalValidation = await validateFinalAnswer(
+      ctx,
+      papers,
+      sourcePaths,
       assistantText,
     );
+
+    if (!finalValidation.isValid) {
+      const repairedText = await runRepairPass(
+        ctx,
+        threadId,
+        papers,
+        draft,
+        assistantText,
+        finalValidation.issues,
+        languageModel,
+      );
+
+      if (repairedText.trim()) {
+        assistantText = repairedText;
+        finalValidation = await validateFinalAnswer(
+          ctx,
+          papers,
+          sourcePaths,
+          assistantText,
+        );
+      }
+    }
+
+    if (!finalValidation.isValid) {
+      const stripped = stripUnsafeContent(assistantText, sourcePaths);
+      if (stripped.trim()) {
+        const strippedValidation = await validateFinalAnswer(
+          ctx,
+          papers,
+          sourcePaths,
+          stripped,
+        );
+        if (strippedValidation.isValid) {
+          assistantText = stripped;
+          finalValidation = strippedValidation;
+        }
+      }
+    }
+
+    if (!finalValidation.isValid) {
+      assistantText =
+        "I couldn't ground a reliable cited answer for that in the PDF.";
+      finalValidation = await validateFinalAnswer(
+        ctx,
+        papers,
+        sourcePaths,
+        assistantText,
+      );
+    }
 
     const messageId = await ctx.runMutation(api.messages.addMessage, {
       threadId,
       role: "assistant" as const,
       content: assistantText,
-      thinking,
-      model: model,
+      model,
       timestamp: new Date().toISOString(),
     });
 
@@ -284,10 +579,10 @@ export const sendMessage = action({
       updatedAt: new Date().toISOString(),
     });
 
-    if (citationValidation.entries.length > 0) {
+    if (finalValidation.citationValidation.entries.length > 0) {
       await ctx.runMutation(api.messageCitations.replaceForMessage, {
         messageId,
-        entries: citationValidation.entries.map((entry) => ({
+        entries: finalValidation.citationValidation.entries.map((entry) => ({
           paperId: entry.paperId as Id<"papers">,
           indexVersion: entry.indexVersion,
           refId: entry.refId,

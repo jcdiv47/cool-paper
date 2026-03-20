@@ -53,7 +53,7 @@ export const MODEL_OPTIONS: ModelOption[] = [
   },
 ];
 
-export const DEFAULT_MODEL = MODEL_OPTIONS[0]?.id ?? "anthropic/claude-haiku-4.5";
+export const DEFAULT_MODEL = "qwen/qwen3.5-35b-a3b";
 
 // ---------------------------------------------------------------------------
 // <think> tag parsing  —  Many open-weight models (Qwen, DeepSeek, …) wrap

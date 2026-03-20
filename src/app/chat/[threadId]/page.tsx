@@ -84,12 +84,15 @@ export default function ActiveChatPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, isNew]);
 
-  // Replace URL once a new thread gets its real ID
+  // Replace URL once a new thread gets its real ID.
+  // Wait until streaming finishes so the component doesn't re-mount and lose
+  // the streaming subscription (which would leave the UI blank until the full
+  // response is persisted).
   useEffect(() => {
-    if (isNew && chat.threadId) {
+    if (isNew && chat.threadId && !chat.isStreaming) {
       router.replace(`/chat/${chat.threadId}`);
     }
-  }, [isNew, chat.threadId, router]);
+  }, [isNew, chat.threadId, chat.isStreaming, router]);
 
   async function handleAddPaper(paperIds: string[]) {
     for (const pid of paperIds) {

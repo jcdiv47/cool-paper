@@ -335,6 +335,70 @@
   background: color-mix(in oklch, var(--primary) 8%, var(--card));
 }
 
+/* ─── Prose overrides for paper summary ─── */
+.prose-summary {
+  --tw-prose-body: oklch(0.78 0 0);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-links: oklch(0.80 0.15 75);
+  --tw-prose-bold: oklch(0.90 0 0);
+  --tw-prose-counters: oklch(0.50 0 0);
+  --tw-prose-bullets: oklch(0.35 0 0);
+  font-family: var(--font-serif);
+  line-height: 1.9;
+}
+.prose-summary > :first-child {
+  margin-top: 0;
+}
+.prose-summary h2 {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: oklch(0.50 0.06 75);
+  border-top: 1px solid oklch(0.25 0 0);
+  padding-top: 2.5rem;
+  margin-top: 3.5rem;
+  margin-bottom: 1.75rem;
+}
+.prose-summary h3 {
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: oklch(0.92 0 0);
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+}
+.prose-summary h3 + p,
+.prose-summary h3 + ul,
+.prose-summary h3 + ol {
+  margin-top: 0;
+}
+.prose-summary p {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+}
+.prose-summary ul,
+.prose-summary ol {
+  padding-left: 1.25em;
+}
+.prose-summary li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.prose-summary code:not(pre code) {
+  background: oklch(0.18 0 0);
+  padding: 0.1em 0.3em;
+  font-size: 0.85em;
+  font-family: var(--font-mono);
+}
+.prose-summary blockquote {
+  border-left-color: oklch(0.30 0.06 75);
+  color: oklch(0.65 0 0);
+  font-style: italic;
+}
+
 /* ─── Floating note panel ─── */
 @keyframes slide-in-right {
   from { transform: translateX(100%); opacity: 0; }

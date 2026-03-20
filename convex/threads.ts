@@ -146,8 +146,9 @@ export const updatePapers = mutation({
     await ctx.db.patch(id, {
       paperIds,
       updatedAt: new Date().toISOString(),
-      // Clear session since paper context changed
+      // Clear session and streaming thread since paper context changed.
       sessionId: undefined,
+      agentThreadId: undefined,
     });
   },
 });

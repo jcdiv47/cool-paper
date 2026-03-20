@@ -72,9 +72,8 @@ export function useConvexChat(): UseConvexChatReturn {
   const agentThreadId = convexThread?.agentThreadId;
 
   // Subscribe to streaming deltas from the agent component
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const streamingUIMessages = useStreamingUIMessages(
-    api.agentStreams.getStreams as any,
+    api.agentStreams.getStreams as Parameters<typeof useStreamingUIMessages>[0],
     agentThreadId && isStreaming ? { threadId: agentThreadId } : "skip",
   );
 
@@ -259,6 +258,8 @@ export function useConvexChat(): UseConvexChatReturn {
       if (!threadId && paperIds.length === 0) return;
 
       setError(null);
+      setIsStreaming(true);
+      abortRef.current = false;
 
       // Lazily create thread on first message
       let activeThreadId = threadId;
@@ -266,23 +267,21 @@ export function useConvexChat(): UseConvexChatReturn {
         try {
           activeThreadId = await createThread(paperIds);
         } catch {
+          setIsStreaming(false);
           setError("Failed to create chat");
           return;
         }
       }
 
-      // Add user message to Convex
-      const timestamp = new Date().toISOString();
-      await addUserMessageMut({
-        threadId: activeThreadId as Id<"threads">,
-        content: content.trim(),
-        timestamp,
-      });
-
-      setIsStreaming(true);
-      abortRef.current = false;
-
       try {
+        // Persist the user turn before invoking the agent.
+        const timestamp = new Date().toISOString();
+        await addUserMessageMut({
+          threadId: activeThreadId as Id<"threads">,
+          content: content.trim(),
+          timestamp,
+        });
+
         // Call the Convex action which runs the agent with streaming
         await chatAction({
           threadId: activeThreadId as Id<"threads">,
