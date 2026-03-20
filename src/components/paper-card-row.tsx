@@ -22,7 +22,7 @@ export function PaperCardRow({ papers, onRemove, onAddClick }: PaperCardRowProps
         return (
           <div
             key={paper.arxivId}
-            className="group relative flex min-w-[180px] max-w-[220px] shrink-0 flex-col gap-1 rounded-xl border border-border bg-card px-3 py-2.5 transition-colors duration-200 hover:bg-secondary"
+            className="group relative flex min-w-[200px] max-w-[220px] shrink-0 flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors duration-200 hover:bg-secondary"
           >
             <p className="line-clamp-2 text-xs font-medium leading-tight">
               {paper.title}

@@ -13,7 +13,6 @@ import { useMutation, useQuery } from "convex/react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -163,8 +162,6 @@ export function PdfViewer({
   chatOpen,
 }: PdfViewerProps) {
   const searchParams = useSearchParams();
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
   const citeRefId = searchParams.get("cite");
   const annotationParam = searchParams.get("annotation");
   const pageParam = searchParams.get("page");
@@ -994,7 +991,7 @@ export function PdfViewer({
 
   return (
     <div className="relative flex h-full flex-col bg-background">
-      <div className="flex h-10 shrink-0 items-center gap-1 border-b border-border/40 bg-muted/30 px-2 backdrop-blur-sm">
+      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/40 bg-card/80 px-2 backdrop-blur-md">
         {onViewSummary && (
           <>
             <Button
@@ -1033,7 +1030,7 @@ export function PdfViewer({
         </Button>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <input
-            className="h-5 w-8 rounded border border-border/50 bg-transparent text-center text-xs text-foreground outline-none focus:border-ring"
+            className="h-5 w-8 rounded-[3px] border border-border/50 bg-transparent text-center text-xs text-foreground outline-none focus:border-ring"
             value={pageInput}
             onChange={(e) => setPageInput(e.target.value)}
             onKeyDown={(e) => {
@@ -1233,7 +1230,7 @@ export function PdfViewer({
           onMouseUp={captureSelection}
           onClick={handleAnnotationClick}
           onContextMenu={handleAnnotationContextMenu}
-          className={cn("flex-1 overflow-auto", isDark && "pdf-dark-pages")}
+          className="flex-1 overflow-auto pdf-dark-pages"
         >
           {rows.map((row) => (
             <div

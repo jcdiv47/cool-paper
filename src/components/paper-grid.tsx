@@ -29,9 +29,7 @@ export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
   if (papers.length === 0) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-border/40 bg-card/30">
-          <FileText className="h-7 w-7 text-muted-foreground/30" />
-        </div>
+        <FileText className="h-10 w-10 text-muted-foreground/20" />
         <div className="space-y-2">
           <h2 className="font-serif text-xl font-medium tracking-tight">
             Your library is empty
@@ -58,7 +56,7 @@ export function PaperGrid({ papers, onDelete, onAdd, search }: PaperGridProps) {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((paper, i) => (
             <PaperCard
               key={paper.arxivId}

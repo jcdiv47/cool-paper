@@ -16,8 +16,8 @@ import type { PaperMetadata } from "@/types";
 function ChatSkeleton() {
   return (
     <div className="mx-auto max-w-3xl space-y-3 px-4 py-8 sm:px-8">
-      <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
-      <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+      <div className="h-4 w-3/4 animate-pulse rounded bg-muted/30" />
+      <div className="h-4 w-1/2 animate-pulse rounded bg-muted/30" />
     </div>
   );
 }

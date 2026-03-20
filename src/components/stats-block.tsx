@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { FileText, Tag, MessageCircle } from "lucide-react";
 import type { PaperMetadata } from "@/types";
 
 const CACHE_KEY = "stats-block-cache";
@@ -58,37 +57,17 @@ export function StatsBlock({ papers }: StatsBlockProps) {
     }
   }, [chatCount]);
 
-  const stats = [
-    { value: paperCount, label: "Papers", icon: FileText, color: "text-primary" },
-    { value: categoryCount, label: "Topics", icon: Tag, color: "text-chart-2" },
-    { value: chatCount, label: "Chats", icon: MessageCircle, color: "text-chart-4" },
-  ];
-
   return (
-    <div className="grid shrink-0 grid-cols-3 gap-3 sm:w-72">
-      {stats.map((s, i) => (
-        <div
-          key={s.label}
-          className="animate-card-enter flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
-          style={{ animationDelay: `${i * 80}ms` }}
-        >
-          <div className={`rounded-lg bg-secondary p-1.5 ${s.color}`}>
-            <s.icon className="h-4 w-4" strokeWidth={1.8} />
-          </div>
-          <div>
-            <div className="font-serif text-2xl font-semibold tabular-nums tracking-tight text-primary">
-              {s.value === null ? (
-                <span className="inline-block h-7 w-5 animate-shimmer rounded" />
-              ) : (
-                s.value
-              )}
-            </div>
-            <div className="text-[11px] font-medium text-muted-foreground/60">
-              {s.label}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <p className="text-sm text-muted-foreground">
+      <span className="font-medium text-foreground">{paperCount}</span> paper{paperCount !== 1 ? "s" : ""}
+      {" · "}
+      <span className="font-medium text-foreground">{categoryCount}</span> topic{categoryCount !== 1 ? "s" : ""}
+      {chatCount !== null && (
+        <>
+          {" · "}
+          <span className="font-medium text-foreground">{chatCount}</span> chat{chatCount !== 1 ? "s" : ""}
+        </>
+      )}
+    </p>
   );
 }

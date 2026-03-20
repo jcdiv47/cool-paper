@@ -99,10 +99,10 @@ export function ModelPickerDialog({
                     onOpenChange(false);
                   }}
                   className={cn(
-                    "group w-full rounded-2xl border px-4 py-4 text-left transition-colors",
+                    "group w-full border px-4 py-4 text-left transition-colors",
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     selected
-                      ? "border-primary bg-primary/5"
+                      ? "border-primary/60 bg-primary/4"
                       : "border-border/60 bg-background hover:border-foreground/20 hover:bg-muted/20",
                     disabledCard &&
                       "cursor-not-allowed opacity-60 hover:border-border/60 hover:bg-background",
@@ -115,7 +115,7 @@ export function ModelPickerDialog({
                           {model.label}
                         </span>
                         {selected ? (
-                          <Badge variant="secondary" className="gap-1 rounded-full">
+                          <Badge variant="secondary" className="gap-1 rounded-[3px]">
                             <Check className="h-3 w-3" />
                             Selected
                           </Badge>
@@ -123,7 +123,7 @@ export function ModelPickerDialog({
                         {model.availability === "unavailable" ? (
                           <Badge
                             variant="outline"
-                            className="rounded-full text-muted-foreground"
+                            className="rounded-[3px] text-muted-foreground"
                           >
                             Unavailable
                           </Badge>
@@ -139,7 +139,7 @@ export function ModelPickerDialog({
                   </div>
 
                   <div className="mt-4 grid gap-2 text-xs text-foreground sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-xl bg-muted/30 px-3 py-2">
+                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Cpu className="h-3.5 w-3.5" />
                         Context
@@ -148,7 +148,7 @@ export function ModelPickerDialog({
                         {formatModelTokenCount(model.contextLength)}
                       </div>
                     </div>
-                    <div className="rounded-xl bg-muted/30 px-3 py-2">
+                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Sparkles className="h-3.5 w-3.5" />
                         Max output
@@ -157,7 +157,7 @@ export function ModelPickerDialog({
                         {formatModelTokenCount(model.maxCompletionTokens)}
                       </div>
                     </div>
-                    <div className="rounded-xl bg-muted/30 px-3 py-2">
+                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Coins className="h-3.5 w-3.5" />
                         Input
@@ -166,7 +166,7 @@ export function ModelPickerDialog({
                         {formatModelPrice(model.promptPricePerMillionUsd)}
                       </div>
                     </div>
-                    <div className="rounded-xl bg-muted/30 px-3 py-2">
+                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Coins className="h-3.5 w-3.5" />
                         Output
@@ -182,7 +182,7 @@ export function ModelPickerDialog({
                       <Badge
                         key={`in-${model.id}-${modality}`}
                         variant="outline"
-                        className="rounded-full text-[11px] text-muted-foreground"
+                        className="rounded-[3px] text-[11px] text-muted-foreground"
                       >
                         In: {modality}
                       </Badge>
@@ -191,7 +191,7 @@ export function ModelPickerDialog({
                       <Badge
                         key={`out-${model.id}-${modality}`}
                         variant="outline"
-                        className="rounded-full text-[11px] text-muted-foreground"
+                        className="rounded-[3px] text-[11px] text-muted-foreground"
                       >
                         Out: {modality}
                       </Badge>
@@ -200,7 +200,7 @@ export function ModelPickerDialog({
                     model.outputModalities.length === 0 ? (
                       <Badge
                         variant="outline"
-                        className="rounded-full text-[11px] text-muted-foreground"
+                        className="rounded-[3px] text-[11px] text-muted-foreground"
                       >
                         Modalities unavailable
                       </Badge>

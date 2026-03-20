@@ -8,7 +8,7 @@ export function MobileNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-border bg-background/80 backdrop-blur-2xl sm:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-12 items-center justify-around border-t border-border bg-background/90 backdrop-blur-lg sm:hidden">
       {MOBILE_NAV.map((item) => {
         const isActive = item.exact
           ? pathname === item.href
@@ -25,6 +25,7 @@ export function MobileNav() {
           >
             <item.icon className="h-5 w-5" />
             {item.label}
+            {isActive && <span className="mt-0.5 h-1 w-1 rounded-full bg-primary" />}
           </Link>
         );
       })}

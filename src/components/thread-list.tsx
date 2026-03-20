@@ -45,7 +45,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-muted/20" />
+          <div key={i} className="h-20 animate-pulse bg-muted/20" />
         ))}
       </div>
     );
@@ -54,9 +54,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
   if (threads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
-        <div className="flex h-14 w-14 items-center justify-center bg-secondary">
-          <MessageCircle className="h-6 w-6 text-primary" />
-        </div>
+        <MessageCircle className="h-8 w-8 text-muted-foreground/30" />
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-foreground">No chats yet</p>
           <p className="text-sm text-muted-foreground">
@@ -75,7 +73,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
             <Button
               variant="ghost"
               onClick={() => onSelect(thread.id)}
-              className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground transition-colors duration-200 hover:bg-secondary hover:text-foreground"
+              className="flex h-auto w-full flex-col items-start gap-1.5 border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground transition-colors duration-200 hover:bg-secondary hover:text-foreground"
             >
               <p className="text-sm font-medium leading-tight pr-8 transition-colors duration-300 group-hover:text-primary">{thread.title}</p>
               {thread.paperTitles.length > 0 && (

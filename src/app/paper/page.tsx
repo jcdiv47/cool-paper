@@ -50,7 +50,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 animate-pulse rounded-xl bg-muted/20" />
+          <div key={i} className="h-24 animate-pulse bg-muted/20" />
         ))}
       </div>
     );
@@ -59,9 +59,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
   if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
-        <div className="flex h-14 w-14 items-center justify-center bg-secondary">
-          <FileText className="h-6 w-6 text-primary" />
-        </div>
+        <FileText className="h-8 w-8 text-muted-foreground/30" />
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-foreground">
             {papers.length === 0 ? "No papers yet" : "No matching papers"}
@@ -86,7 +84,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
               <Button
                 variant="ghost"
                 onClick={() => onSelect(sanitizedId)}
-                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground whitespace-normal overflow-hidden transition-colors duration-200 hover:bg-secondary hover:text-foreground"
+                className="flex h-auto w-full flex-col items-start gap-1.5 border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground whitespace-normal overflow-hidden transition-colors duration-200 hover:bg-secondary hover:text-foreground"
               >
                 <p className="text-sm font-semibold leading-tight pr-8 line-clamp-2 transition-colors duration-300 group-hover:text-primary">
                   {paper.title}

@@ -11,7 +11,7 @@ import { AddPaperDialog } from "@/components/add-paper-dialog";
 import { useDeletePaper, useRetryImport } from "@/hooks/use-paper-actions";
 import { parseImportStatus, importStateSortKey } from "@/lib/import-status";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowRight, Sparkles } from "lucide-react";
+import { Plus, ArrowRight, BookOpen } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import Link from "next/link";
 import type { PaperMetadata } from "@/types";
@@ -100,11 +100,11 @@ export default function Home() {
               <div className="h-10 w-full max-w-md animate-shimmer rounded-lg" />
               <div className="h-3 w-24 animate-shimmer rounded" />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="animate-card-enter rounded-xl border border-border/20 p-5"
+                  className="animate-card-enter border border-border/20 p-5"
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div className="space-y-3">
@@ -121,28 +121,25 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="space-y-14">
-            {/* Stats + Heatmap */}
-            {papers.length > 0 && (
-              <div className="flex flex-col gap-6 sm:flex-row sm:gap-8">
-                <StatsBlock papers={papers} />
-                <ActivityHeatmap papers={papers} />
-              </div>
-            )}
+          <div className="space-y-16">
+            {/* Hero heading + inline stats */}
+            <section>
+              <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                Library
+              </h1>
+              {papers.length > 0 && (
+                <div className="mt-2">
+                  <StatsBlock papers={papers} />
+                </div>
+              )}
+            </section>
 
             {/* Recently Added Papers */}
             <section>
               <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="font-serif text-xl font-semibold tracking-tight text-foreground">
-                    Recent Papers
-                  </h2>
-                  {papers.length > 0 && (
-                    <span className="bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-                      {papers.length}
-                    </span>
-                  )}
-                </div>
+                <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Recent Papers
+                </h2>
                 <div className="flex items-center gap-2">
                   {papers.length > 6 && (
                     <Link
@@ -164,10 +161,8 @@ export default function Home() {
                 </div>
               </div>
               {recentPapers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-6 rounded-xl border border-border bg-card py-24 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center bg-primary/10">
-                    <Sparkles className="h-7 w-7 text-primary" />
-                  </div>
+                <div className="flex flex-col items-center justify-center gap-6 border border-border bg-card py-24 text-center">
+                  <BookOpen className="h-10 w-10 text-muted-foreground/20" />
                   <div className="space-y-2">
                     <p className="font-serif text-lg font-semibold text-foreground">
                       Your library is empty
@@ -182,7 +177,7 @@ export default function Home() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {recentPapers.map((paper, i) => (
                     <PaperCard
                       key={paper.arxivId}
@@ -195,6 +190,16 @@ export default function Home() {
                 </div>
               )}
             </section>
+
+            {/* Activity */}
+            {papers.length > 0 && (
+              <section>
+                <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Activity
+                </h2>
+                <ActivityHeatmap papers={papers} />
+              </section>
+            )}
           </div>
         )}
       </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Search, ChevronRight, ArrowLeft } from "lucide-react";
+import { Search, ChevronRight, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -36,19 +36,16 @@ export function Header({
   const backCrumb = breadcrumbs?.find((b) => b.href);
 
   return (
-    <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-2xl">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div
-        className={`flex h-14 items-center gap-4 px-4 sm:px-6 ${fullWidth ? "" : "mx-auto max-w-7xl"}`}
+        className={`flex h-12 items-center gap-4 px-4 sm:px-6 ${fullWidth ? "" : "mx-auto max-w-7xl"}`}
       >
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80"
         >
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
-            <FileText className="h-3.5 w-3.5 text-primary-foreground" />
-          </div>
-          <span className="hidden font-serif text-[15px] font-semibold tracking-tight sm:inline">
-            Cool Paper
+          <span className="font-serif text-[15px] font-semibold tracking-tight">
+            <span className="text-primary">C</span>ool Paper
           </span>
         </Link>
 
@@ -59,10 +56,10 @@ export function Header({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -117,7 +114,7 @@ export function Header({
 
         {onSearchChange !== undefined && (
           <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/40" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
             <Input
               value={search ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
@@ -136,8 +133,6 @@ export function Header({
           {secondaryToolbar}
         </div>
       )}
-      {/* Border line */}
-      <div className="h-px bg-border" />
     </header>
   );
 }

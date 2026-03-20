@@ -294,7 +294,7 @@ export default function PaperPage({
       {!isDesktop && (
         <>
           <div className="pointer-events-none fixed inset-x-0 bottom-14 z-30 px-4 pb-2 sm:hidden">
-            <div className="pointer-events-auto mx-auto flex max-w-sm items-center justify-center rounded-2xl border border-border/60 bg-background/92 p-1.5 shadow-lg backdrop-blur">
+            <div className="pointer-events-auto mx-auto flex max-w-sm items-center justify-center rounded-[6px] border border-border/60 bg-background/92 p-1.5 shadow-lg backdrop-blur">
               <Button
                 variant={mobilePanel === "chat" ? "secondary" : "ghost"}
                 size="sm"
@@ -310,7 +310,7 @@ export default function PaperPage({
           <Sheet open={mobilePanel === "chat"} onOpenChange={(open) => !open && setMobilePanel(null)}>
             <SheetContent
               side="bottom"
-              className="h-[78vh] rounded-t-3xl border-border/60 bg-background p-0 sm:hidden"
+              className="h-[78vh] rounded-t-[8px] border-border/60 bg-background p-0 sm:hidden"
               showCloseButton={false}
             >
               <SheetHeader className="sr-only">

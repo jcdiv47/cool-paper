@@ -56,7 +56,7 @@ export function PaperCard({
         className="animate-card-enter block"
         style={{ animationDelay: `${index * 60}ms` }}
       >
-        <Card className={`group h-full border-border bg-card transition-colors duration-200 hover:bg-secondary ${
+        <Card className={`group h-full border-border bg-card transition-colors duration-200 hover:border-primary/30 ${
           paper.importState.phase === "importing" ? "border-l-2 border-l-muted-foreground/20" :
           paper.importState.phase === "failed" ? "border-l-2 border-l-destructive/40" : ""
         }`}>
@@ -113,17 +113,17 @@ export function PaperCard({
             </div>
 
             {/* Title */}
-            <h3 className="font-serif text-base font-semibold leading-snug tracking-tight line-clamp-2 group-hover:text-primary transition-colors duration-300">
+            <h3 className="font-serif text-base font-semibold leading-snug tracking-tight line-clamp-2 group-hover:text-primary transition-colors duration-200">
               {paper.title}
             </h3>
 
             {/* Authors */}
-            <p className="text-[12px] text-muted-foreground/60">
+            <p className="text-[12px] text-muted-foreground/50">
               {truncatedAuthors}
             </p>
 
             {/* Abstract */}
-            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/40">
+            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/50">
               {abstractExcerpt}
             </p>
 
@@ -132,7 +132,7 @@ export function PaperCard({
               {paper.categories.slice(0, 3).map((cat) => (
                 <span
                   key={cat}
-                  className="rounded-md border border-border bg-secondary px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                  className="rounded-md border border-border/60 bg-transparent px-1.5 py-px font-mono text-[10px] text-muted-foreground"
                 >
                   {cat}
                 </span>

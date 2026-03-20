@@ -160,7 +160,7 @@ function ThinkingCard({
         <div
           ref={thinkingScrollRef}
           onScroll={handleThinkingScroll}
-          className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border/40 bg-muted/20 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+          className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border/30 bg-muted/15 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
         >
           {thinking}
         </div>
@@ -196,7 +196,7 @@ function AssistantMessage({
         />
       ) : null}
       {message.content ? (
-        <article className="prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif">
+        <article className="prose prose-zinc prose-invert prose-chat prose-sm max-w-none font-serif">
           <CitationMarkdown
             content={message.content}
             targets={citationTargets}
@@ -239,7 +239,7 @@ function StreamingAssistantMessage({
         isActivelyThinking={isThinking}
       />
       {message.content ? (
-        <article className={`prose prose-zinc dark:prose-invert prose-chat prose-sm max-w-none font-serif${showCursor ? ' streaming-cursor' : ''}`}>
+        <article className={`prose prose-zinc prose-invert prose-chat prose-sm max-w-none font-serif${showCursor ? ' streaming-cursor' : ''}`}>
           <CitationMarkdown
             content={message.content}
             targets={citationTargets}
@@ -460,7 +460,7 @@ export function ChatView({
         >
           {msg.role === "user" ? (
             <div className="flex justify-end">
-              <div className="max-w-[85%] bg-primary/10 px-4 py-2.5">
+              <div className="max-w-[85%] rounded-lg border-l-2 border-primary/30 bg-primary/8 px-4 py-2.5">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">
                   {msg.content}
                 </p>
@@ -507,9 +507,7 @@ export function ChatView({
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8">
           {!hasConversation ? (
             <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
-              <div className="flex h-14 w-14 items-center justify-center bg-secondary">
-                <MessageCircle className="h-6 w-6 text-primary" />
-              </div>
+              <MessageCircle className="h-8 w-8 text-muted-foreground/30" />
               <div className="space-y-2">
                 <p className="text-base font-semibold text-foreground">
                   {emptyHeading}
@@ -554,7 +552,7 @@ export function ChatView({
           )}
 
           {error && (
-            <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+            <div className="mt-4 rounded-[4px] border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -568,7 +566,7 @@ export function ChatView({
             type="button"
             variant="outline"
             size="sm"
-            className="h-10 shrink-0 gap-2 rounded-xl px-3 text-left"
+            className="h-10 shrink-0 gap-2 rounded-[6px] px-3 text-left"
             onClick={() => setModelPickerOpen(true)}
             disabled={isStreaming}
           >
@@ -585,7 +583,7 @@ export function ChatView({
             onKeyDown={handleKeyDown}
             placeholder={placeholderText}
             rows={1}
-            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary focus:bg-background"
+            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-[6px] border border-border bg-secondary px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary focus:bg-background"
             disabled={isStreaming}
           />
           {isStreaming ? (

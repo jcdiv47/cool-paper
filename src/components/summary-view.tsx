@@ -84,8 +84,8 @@ export function SummaryView({
           <h1
             className={
               compact
-                ? "font-serif text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl"
-                : "font-serif text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-3xl md:text-[2.25rem] md:leading-[1.15]"
+                ? "font-serif text-xl font-bold leading-snug tracking-[-0.02em] text-foreground sm:text-2xl"
+                : "font-serif text-2xl font-bold leading-snug tracking-[-0.02em] text-foreground sm:text-3xl md:text-[2.25rem] md:leading-[1.15]"
             }
           >
             {paper.title}
@@ -97,7 +97,7 @@ export function SummaryView({
             {paper.categories.map((cat) => (
               <span
                 key={cat}
-                className="rounded-md border border-border bg-secondary px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                className="rounded-md border border-border/60 bg-transparent px-1.5 py-px font-mono text-[10px] text-muted-foreground"
               >
                 {cat}
               </span>
@@ -151,8 +151,8 @@ export function SummaryView({
             <article
               className={
                 compact
-                  ? "prose prose-sm prose-summary max-w-none dark:prose-invert"
-                  : "prose prose-lg prose-summary max-w-none dark:prose-invert"
+                  ? "prose prose-sm prose-summary max-w-none prose-invert"
+                  : "prose prose-lg prose-summary max-w-none prose-invert"
               }
             >
               <CitationMarkdown
