@@ -36,14 +36,12 @@ export interface UseConvexChatReturn {
 }
 
 export function useConvexChat(): UseConvexChatReturn {
-  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [paperIds, setPaperIds] = useState<string[]>([]);
   const [model, setModelRaw] = useState<string>(DEFAULT_MODEL);
   const modelOverrideRef = useRef(false);
   const abortRef = useRef(false);
-  const lastStreamRef = useRef<ThreadMessage | null>(null);
 
   // Wrap setModel so user-initiated changes take priority over server sync
   const setModel = useCallback((newModel: string) => {
@@ -55,7 +53,8 @@ export function useConvexChat(): UseConvexChatReturn {
   const createThreadMut = useMutation(api.threads.create);
   const addUserMessageMut = useMutation(api.messages.addUserMessage);
   const updatePapersMut = useMutation(api.threads.updatePapers);
-  const chatAction = useAction(api.actions.chat.sendMessage);
+  const startChatAction = useAction(api.actions.chat.startChat);
+  const cancelChatMut = useMutation(api.threads.cancelChat);
 
   // Subscribe to messages for current thread
   const convexMessages = useQuery(
@@ -68,6 +67,9 @@ export function useConvexChat(): UseConvexChatReturn {
     api.threads.get,
     threadId ? { id: threadId as Id<"threads"> } : "skip"
   );
+
+  // Server-authoritative streaming state
+  const isStreaming = convexThread?.chatStatus === "generating";
 
   const agentThreadId = convexThread?.agentThreadId;
 
@@ -91,15 +93,13 @@ export function useConvexChat(): UseConvexChatReturn {
     [convexMessages]
   );
 
-  // Build streaming message from agent UIMessages (real-time text + thinking)
+  // Build streaming message from agent UIMessages (real-time text + thinking).
+  // persistChatResult clears chatStatus and inserts the message atomically,
+  // so there is no gap to bridge when isStreaming flips to false.
   const streamingMessage = useMemo<ThreadMessage | null>(() => {
-    if (!isStreaming) {
-      lastStreamRef.current = null;
-      return null;
-    }
+    if (!isStreaming) return null;
 
     if (streamingUIMessages?.length) {
-      // Find the last assistant message in the stream
       const assistantMsgs = streamingUIMessages.filter(
         (m) => m.role === "assistant"
       );
@@ -118,27 +118,22 @@ export function useConvexChat(): UseConvexChatReturn {
           }
         }
 
-        // Parse <think> tags from text (Qwen, DeepSeek, etc.)
         const { thinking: tagThinking, content: cleanText } =
           parseThinkTags(rawText);
 
-        const msg: ThreadMessage = {
-          role: "assistant",
+        return {
+          role: "assistant" as const,
           content: cleanText,
           thinking: structuredThinking || tagThinking || undefined,
           timestamp: new Date().toISOString(),
           model,
         };
-
-        lastStreamRef.current = msg;
-        return msg;
       }
     }
 
-    // Use last known content (bridges gap between stream end and message save)
-    // or show empty placeholder while waiting for first deltas
-    return lastStreamRef.current ?? {
-      role: "assistant",
+    // Waiting for first deltas (draft pass running, or gap between passes)
+    return {
+      role: "assistant" as const,
       content: "",
       timestamp: new Date().toISOString(),
       model,
@@ -225,6 +220,7 @@ export function useConvexChat(): UseConvexChatReturn {
 
   const addPaper = useCallback(
     async (paperId: string) => {
+      if (isStreaming) return;
       const newIds = [...paperIds, paperId];
       if (threadId) {
         await updatePapersMut({
@@ -234,11 +230,12 @@ export function useConvexChat(): UseConvexChatReturn {
       }
       setPaperIds(newIds);
     },
-    [threadId, paperIds, updatePapersMut]
+    [threadId, paperIds, isStreaming, updatePapersMut]
   );
 
   const removePaper = useCallback(
     async (paperId: string) => {
+      if (isStreaming) return;
       if (paperIds.length <= 1) return;
       const newIds = paperIds.filter((id) => id !== paperId);
       if (threadId) {
@@ -249,8 +246,12 @@ export function useConvexChat(): UseConvexChatReturn {
       }
       setPaperIds(newIds);
     },
-    [threadId, paperIds, updatePapersMut]
+    [threadId, paperIds, isStreaming, updatePapersMut]
   );
+
+  // Merge async workflow errors into local error state
+  const chatError = convexThread?.chatError;
+  const mergedError = error || chatError || null;
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -258,7 +259,6 @@ export function useConvexChat(): UseConvexChatReturn {
       if (!threadId && paperIds.length === 0) return;
 
       setError(null);
-      setIsStreaming(true);
       abortRef.current = false;
 
       // Lazily create thread on first message
@@ -267,7 +267,6 @@ export function useConvexChat(): UseConvexChatReturn {
         try {
           activeThreadId = await createThread(paperIds);
         } catch {
-          setIsStreaming(false);
           setError("Failed to create chat");
           return;
         }
@@ -282,8 +281,8 @@ export function useConvexChat(): UseConvexChatReturn {
           timestamp,
         });
 
-        // Call the Convex action which runs the agent with streaming
-        await chatAction({
+        // Kick off the workflow (returns immediately)
+        await startChatAction({
           threadId: activeThreadId as Id<"threads">,
           message: content.trim(),
           model,
@@ -292,8 +291,6 @@ export function useConvexChat(): UseConvexChatReturn {
         if (!abortRef.current) {
           setError(e instanceof Error ? e.message : "Failed to send message");
         }
-      } finally {
-        setIsStreaming(false);
       }
     },
     [
@@ -303,21 +300,23 @@ export function useConvexChat(): UseConvexChatReturn {
       model,
       createThread,
       addUserMessageMut,
-      chatAction,
+      startChatAction,
     ]
   );
 
   const cancelStream = useCallback(() => {
     abortRef.current = true;
-    setIsStreaming(false);
-  }, []);
+    if (threadId) {
+      cancelChatMut({ id: threadId as Id<"threads"> });
+    }
+  }, [threadId, cancelChatMut]);
 
   return {
     messages,
     streamingMessage,
     isStreaming,
     isThinking,
-    error,
+    error: mergedError,
     sendMessage,
     cancelStream,
     loadThread,

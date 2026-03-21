@@ -1,8 +1,9 @@
 "use node";
 
-import { action, type ActionCtx } from "../_generated/server";
+import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
+import { workflow } from "../workflow";
 import {
   annotationRules,
   citationRules,
@@ -385,6 +386,26 @@ async function validateFinalAnswer(
   };
 }
 
+async function loadPaperContext(ctx: ActionCtx, paperIds: string[]) {
+  const papers: Doc<"papers">[] = [];
+  const annotationsByPaper = new Map<string, Doc<"annotations">[]>();
+  for (const pid of paperIds) {
+    const paper = await ctx.runQuery(api.papers.get, { sanitizedId: pid });
+    if (!paper) continue;
+    papers.push(paper);
+    const annotations = await ctx.runQuery(api.annotations.listByPaper, {
+      paperId: paper._id,
+    });
+    annotationsByPaper.set(String(paper._id), annotations);
+  }
+
+  if (papers.length === 0) {
+    throw new Error("No valid papers found for this thread");
+  }
+
+  return { papers, annotationsByPaper };
+}
+
 async function runGroundingPass(
   ctx: ActionCtx,
   threadId: Id<"threads">,
@@ -447,40 +468,32 @@ async function runRepairPass(
   return cleanModelText(await result.text);
 }
 
-export const sendMessage = action({
+// ---------------------------------------------------------------------------
+// Workflow-based chat: startChat + step actions
+// ---------------------------------------------------------------------------
+
+export const startChat = action({
   args: {
     threadId: v.id("threads"),
     message: v.string(),
     model: v.optional(v.string()),
   },
-  handler: async (
-    ctx,
-    { threadId, message, model },
-  ): Promise<{ text: string; messageId: string }> => {
+  handler: async (ctx, { threadId, message, model }) => {
+    // Snapshot paper context before anything else
     const thread = await ctx.runQuery(api.threads.get, { id: threadId });
     if (!thread) throw new Error("Thread not found");
+    const paperIds = thread.paperIds;
 
-    const papers: Doc<"papers">[] = [];
-    const annotationsByPaper = new Map<string, Doc<"annotations">[]>();
-    for (const pid of thread.paperIds) {
-      const paper = await ctx.runQuery(api.papers.get, { sanitizedId: pid });
-      if (!paper) continue;
-      papers.push(paper);
-      const annotations = await ctx.runQuery(api.annotations.listByPaper, {
-        paperId: paper._id,
-      });
-      annotationsByPaper.set(String(paper._id), annotations);
-    }
+    const generation = await ctx.runMutation(
+      internal.threads.setChatGenerating,
+      { id: threadId },
+    );
 
-    if (papers.length === 0) {
-      throw new Error("No valid papers found for this thread");
-    }
-
-    const existingMessages = await ctx.runQuery(api.messages.listByThread, {
+    const messages = await ctx.runQuery(api.messages.listByThread, {
       threadId,
     });
-    const userMessages = existingMessages.filter(
-      (entry: { role: string }) => entry.role === "user",
+    const userMessages = messages.filter(
+      (m: { role: string }) => m.role === "user",
     );
     if (userMessages.length <= 1) {
       await ctx.runMutation(api.threads.updateTitle, {
@@ -489,6 +502,43 @@ export const sendMessage = action({
       });
     }
 
+    try {
+      await workflow.start(ctx, internal.workflows.chat.runChat, {
+        threadId,
+        message,
+        model,
+        paperIds,
+        generation,
+      });
+    } catch (e) {
+      await ctx.runMutation(internal.threads.clearChatStatus, {
+        id: threadId,
+      });
+      throw e;
+    }
+  },
+});
+
+export const draftPass = internalAction({
+  args: {
+    threadId: v.id("threads"),
+    message: v.string(),
+    model: v.optional(v.string()),
+    paperIds: v.array(v.string()),
+    generation: v.number(),
+  },
+  handler: async (ctx, { threadId, message, model, paperIds, generation }) => {
+    const thread = await ctx.runQuery(api.threads.get, { id: threadId });
+    if (!thread || thread.chatGeneration !== generation) {
+      throw new Error("Chat generation stale");
+    }
+    const { papers, annotationsByPaper } = await loadPaperContext(
+      ctx,
+      paperIds,
+    );
+    const existingMessages = await ctx.runQuery(api.messages.listByThread, {
+      threadId,
+    });
     const languageModel = resolveModel(model);
     const sourcePaths = await listSourcePathsForPapers(ctx, papers);
 
@@ -501,7 +551,29 @@ export const sendMessage = action({
       languageModel,
     );
 
-    let assistantText = await runGroundingPass(
+    return { draftJson: JSON.stringify(draft), sourcePaths };
+  },
+});
+
+export const groundAndValidate = internalAction({
+  args: {
+    threadId: v.id("threads"),
+    draftJson: v.string(),
+    sourcePaths: v.array(v.string()),
+    model: v.optional(v.string()),
+    paperIds: v.array(v.string()),
+    generation: v.number(),
+  },
+  handler: async (ctx, { threadId, draftJson, sourcePaths, model, paperIds, generation }) => {
+    const thread = await ctx.runQuery(api.threads.get, { id: threadId });
+    if (!thread || thread.chatGeneration !== generation) {
+      throw new Error("Chat generation stale");
+    }
+    const { papers } = await loadPaperContext(ctx, paperIds);
+    const draft = JSON.parse(draftJson) as DraftAnswer;
+    const languageModel = resolveModel(model);
+
+    const assistantText = await runGroundingPass(
       ctx,
       threadId,
       papers,
@@ -509,36 +581,69 @@ export const sendMessage = action({
       languageModel,
     );
 
-    let finalValidation = await validateFinalAnswer(
+    const validation = await validateFinalAnswer(
       ctx,
       papers,
       sourcePaths,
       assistantText,
     );
 
-    if (!finalValidation.isValid) {
-      const repairedText = await runRepairPass(
-        ctx,
-        threadId,
-        papers,
-        draft,
-        assistantText,
-        finalValidation.issues,
-        languageModel,
-      );
+    return {
+      assistantText,
+      citationEntries: validation.citationValidation.entries.map((e) => ({
+        paperId: e.paperId as Id<"papers">,
+        indexVersion: e.indexVersion,
+        refId: e.refId,
+        occurrence: e.occurrence,
+      })),
+      issues: validation.issues,
+      isValid: validation.isValid,
+    };
+  },
+});
 
-      if (repairedText.trim()) {
-        assistantText = repairedText;
-        finalValidation = await validateFinalAnswer(
-          ctx,
-          papers,
-          sourcePaths,
-          assistantText,
-        );
-      }
+export const repairPass = internalAction({
+  args: {
+    threadId: v.id("threads"),
+    draftJson: v.string(),
+    invalidText: v.string(),
+    issues: v.array(v.string()),
+    sourcePaths: v.array(v.string()),
+    model: v.optional(v.string()),
+    paperIds: v.array(v.string()),
+    generation: v.number(),
+  },
+  handler: async (
+    ctx,
+    { threadId, draftJson, invalidText, issues, sourcePaths, model, paperIds, generation },
+  ) => {
+    const thread = await ctx.runQuery(api.threads.get, { id: threadId });
+    if (!thread || thread.chatGeneration !== generation) {
+      throw new Error("Chat generation stale");
     }
+    const { papers } = await loadPaperContext(ctx, paperIds);
+    const draft = JSON.parse(draftJson) as DraftAnswer;
+    const languageModel = resolveModel(model);
 
-    if (!finalValidation.isValid) {
+    const repairedText = await runRepairPass(
+      ctx,
+      threadId,
+      papers,
+      draft,
+      invalidText,
+      issues,
+      languageModel,
+    );
+
+    let assistantText = repairedText.trim() ? repairedText : invalidText;
+    let validation = await validateFinalAnswer(
+      ctx,
+      papers,
+      sourcePaths,
+      assistantText,
+    );
+
+    if (!validation.isValid) {
       const stripped = stripUnsafeContent(assistantText, sourcePaths);
       if (stripped.trim()) {
         const strippedValidation = await validateFinalAnswer(
@@ -549,15 +654,15 @@ export const sendMessage = action({
         );
         if (strippedValidation.isValid) {
           assistantText = stripped;
-          finalValidation = strippedValidation;
+          validation = strippedValidation;
         }
       }
     }
 
-    if (!finalValidation.isValid) {
+    if (!validation.isValid) {
       assistantText =
         "I couldn't ground a reliable cited answer for that in the PDF.";
-      finalValidation = await validateFinalAnswer(
+      validation = await validateFinalAnswer(
         ctx,
         papers,
         sourcePaths,
@@ -565,32 +670,15 @@ export const sendMessage = action({
       );
     }
 
-    const messageId = await ctx.runMutation(api.messages.addMessage, {
-      threadId,
-      role: "assistant" as const,
-      content: assistantText,
-      model,
-      timestamp: new Date().toISOString(),
-    });
-
-    await ctx.runMutation(api.threads.updateSession, {
-      id: threadId,
-      model: model || undefined,
-      updatedAt: new Date().toISOString(),
-    });
-
-    if (finalValidation.citationValidation.entries.length > 0) {
-      await ctx.runMutation(api.messageCitations.replaceForMessage, {
-        messageId,
-        entries: finalValidation.citationValidation.entries.map((entry) => ({
-          paperId: entry.paperId as Id<"papers">,
-          indexVersion: entry.indexVersion,
-          refId: entry.refId,
-          occurrence: entry.occurrence,
-        })),
-      });
-    }
-
-    return { text: assistantText, messageId: String(messageId) };
+    return {
+      assistantText,
+      citationEntries: validation.citationValidation.entries.map((e) => ({
+        paperId: e.paperId as Id<"papers">,
+        indexVersion: e.indexVersion,
+        refId: e.refId,
+        occurrence: e.occurrence,
+      })),
+    };
   },
 });
+

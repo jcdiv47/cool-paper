@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const list = query({
@@ -137,6 +137,44 @@ export const updateAgentThread = mutation({
   },
   handler: async (ctx, { id, agentThreadId }) => {
     await ctx.db.patch(id, { agentThreadId });
+  },
+});
+
+export const setChatGenerating = internalMutation({
+  args: { id: v.id("threads") },
+  handler: async (ctx, { id }) => {
+    const thread = await ctx.db.get(id);
+    const generation = (thread?.chatGeneration ?? 0) + 1;
+    await ctx.db.patch(id, {
+      chatStatus: "generating",
+      chatError: undefined,
+      chatGeneration: generation,
+    });
+    return generation;
+  },
+});
+
+export const clearChatStatus = internalMutation({
+  args: { id: v.id("threads") },
+  handler: async (ctx, { id }) => {
+    await ctx.db.patch(id, {
+      chatStatus: undefined,
+      chatError: undefined,
+    });
+  },
+});
+
+export const cancelChat = mutation({
+  args: { id: v.id("threads") },
+  handler: async (ctx, { id }) => {
+    const thread = await ctx.db.get(id);
+    if (thread?.chatStatus === "generating") {
+      await ctx.db.patch(id, {
+        chatStatus: undefined,
+        chatError: undefined,
+        chatGeneration: (thread.chatGeneration ?? 0) + 1,
+      });
+    }
   },
 });
 
