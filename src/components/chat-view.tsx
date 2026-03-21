@@ -7,9 +7,14 @@ import {
   Square,
   MessageCircle,
   ChevronRight,
+  ChevronDown,
   Brain,
   LoaderCircle,
-  ChevronsUpDown,
+  Cpu,
+  Check,
+  ExternalLink,
+  Plus,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +22,7 @@ import {
   CollapsibleTrigger,
   CollapsibleContent,
 } from "@/components/ui/collapsible";
-import { getModelLabel } from "@/lib/models";
+import { getModelLabel, MODEL_OPTIONS } from "@/lib/models";
 import { PaperCardRow } from "@/components/paper-card-row";
 import {
   CitationMarkdown,
@@ -27,6 +32,14 @@ import {
 import { parseAnnotationTokens } from "@/lib/annotation-links";
 import { parseCitationTokens } from "@/lib/citations";
 import { ModelPickerDialog } from "@/components/model-picker-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { api } from "../../convex/_generated/api";
 import type { ThreadMessage, PaperMetadata } from "@/types";
 
@@ -49,6 +62,10 @@ interface ChatViewProps {
   activeCiteRefId?: string;
   /** When set, scroll the chat to the message containing this refId and flash it. */
   scrollToRefId?: string;
+  /** Navigate to the dedicated chat page for this thread. */
+  onGoToChat?: () => void;
+  /** Create a new chat with the same paper(s). */
+  onNewChat?: () => void;
 }
 
 const SINGLE_SUGGESTIONS = [
@@ -283,6 +300,8 @@ export function ChatView({
   hidePaperCards,
   activeCiteRefId,
   scrollToRefId,
+  onGoToChat,
+  onNewChat,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -612,17 +631,42 @@ export function ChatView({
       {/* Input area */}
       <div className="border-t border-border/30 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-8">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-10 shrink-0 gap-2 rounded-xl px-3 text-left"
-            onClick={() => setModelPickerOpen(true)}
-            disabled={isStreaming}
-          >
-            <div className="text-xs font-medium">{getModelLabel(model)}</div>
-            <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0 rounded-xl"
+                disabled={isStreaming}
+                aria-label={`Model: ${getModelLabel(model)}`}
+              >
+                <Cpu className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Model
+              </DropdownMenuLabel>
+              {MODEL_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.id}
+                  onClick={() => onModelChange(opt.id)}
+                  className="flex items-center justify-between"
+                >
+                  <span>{opt.label}</span>
+                  {opt.id === model && (
+                    <Check className="h-3.5 w-3.5 text-primary" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setModelPickerOpen(true)}>
+                <MoreHorizontal className="h-3.5 w-3.5" />
+                View all models
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <textarea
             ref={textareaRef}
             value={input}
@@ -645,6 +689,42 @@ export function ChatView({
             >
               <Square className="h-4 w-4" />
             </Button>
+          ) : onGoToChat || onNewChat ? (
+            <div className="flex shrink-0 items-center rounded-xl border border-input bg-input/20 shadow-xs">
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-l-xl px-4 text-sm font-medium transition-colors hover:bg-input/40 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+                onClick={handleSubmit}
+                disabled={!input.trim()}
+              >
+                <Send />
+                Send
+              </button>
+              <div className="h-5 w-px bg-border" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="inline-flex h-10 w-9 items-center justify-center rounded-r-xl transition-colors hover:bg-input/40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+                    aria-label="More options"
+                  >
+                    <ChevronDown />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {onGoToChat && (
+                    <DropdownMenuItem onClick={onGoToChat}>
+                      <ExternalLink />
+                      Go to chat
+                    </DropdownMenuItem>
+                  )}
+                  {onNewChat && (
+                    <DropdownMenuItem onClick={onNewChat}>
+                      <Plus />
+                      New chat
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           ) : (
             <Button
               size="icon"

@@ -251,7 +251,7 @@ export default function PaperPage({
         fullWidth
         breadcrumbs={[
           { label: "Papers", href: "/paper" },
-          { label: paper.title },
+          { label: paper.title, href: `/paper/${id}` },
         ]}
       />
 
@@ -285,7 +285,6 @@ export default function PaperPage({
           <LazyPdfViewer
             paperId={id}
             onToggleChat={isDesktop ? handleToggleChat : undefined}
-            onViewSummary={() => updateUrl({ view: null })}
             chatOpen={chatOpen}
             onReturnToChat={handleReturnToChat}
           />

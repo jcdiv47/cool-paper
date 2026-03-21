@@ -61,4 +61,28 @@ function Button({
   )
 }
 
-export { Button, buttonVariants }
+function ButtonGroup({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="button-group"
+      className={cn(
+        "inline-flex items-center",
+        // Reset all buttons inside the group
+        "[&_[data-slot=button]]:rounded-none [&_[data-slot=button]]:shadow-none",
+        // Round the left side of the first button
+        "[&>:first-child]:rounded-l-lg [&>:first-child>button]:rounded-l-lg",
+        // Round the right side of the last button
+        "[&>:last-child]:rounded-r-lg [&>:last-child>button]:rounded-r-lg",
+        // Remove right border on all but the last button for seamless join
+        "[&>:not(:last-child)>button]:border-r-0 [&>button:not(:last-child)]:border-r-0",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Button, ButtonGroup, buttonVariants }

@@ -36,6 +36,7 @@ import {
 import {
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   ZoomIn,
   ZoomOut,
   PanelLeft,
@@ -48,7 +49,11 @@ import {
   PenLine,
   PanelRight,
   MessageCircle,
-  AlignLeft,
+  Image,
+  List,
+  FileText,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -70,10 +75,46 @@ const ZOOM_MIN = 25;
 const ZOOM_MAX = 500;
 const MAX_SELECTION_CHARS = 1200;
 
+interface OutlineItem {
+  title: string;
+  pageNumber: number;
+  items: OutlineItem[];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveOutline(doc: any): Promise<OutlineItem[]> {
+  const raw = await doc.getOutline();
+  if (!raw) return [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function resolve(items: any[]): Promise<OutlineItem[]> {
+    const result: OutlineItem[] = [];
+    for (const item of items) {
+      let pageNumber = 1;
+      try {
+        let dest = item.dest;
+        if (typeof dest === "string") {
+          dest = await doc.getDestination(dest);
+        }
+        if (Array.isArray(dest) && dest[0]) {
+          const pageIndex = await doc.getPageIndex(dest[0]);
+          pageNumber = pageIndex + 1;
+        }
+      } catch {
+        // fallback to page 1 if resolution fails
+      }
+      const children = item.items?.length ? await resolve(item.items) : [];
+      result.push({ title: item.title, pageNumber, items: children });
+    }
+    return result;
+  }
+
+  return resolve(raw);
+}
+
 interface PdfViewerProps {
   paperId: string;
   onToggleChat?: () => void;
-  onViewSummary?: () => void;
   chatOpen?: boolean;
   /** Called when user clicks "Back to chat" after navigating to a citation. */
   onReturnToChat?: (refId: string) => void;
@@ -149,6 +190,87 @@ function clearBrowserSelection() {
   window.getSelection()?.removeAllRanges();
 }
 
+/* ---------- Outline / TOC tree component ---------- */
+
+function OutlineTree({
+  items,
+  currentPage,
+  goTo,
+  depth = 0,
+  defaultExpanded,
+}: {
+  items: OutlineItem[];
+  currentPage: number;
+  goTo: (page: number) => void;
+  depth?: number;
+  defaultExpanded?: boolean;
+}) {
+  return (
+    <div className={depth > 0 ? "ml-3" : ""}>
+      {items.map((item, i) => (
+        <OutlineNode key={`${depth}-${i}`} item={item} currentPage={currentPage} goTo={goTo} depth={depth} defaultExpanded={defaultExpanded} />
+      ))}
+    </div>
+  );
+}
+
+function OutlineNode({
+  item,
+  currentPage,
+  goTo,
+  depth,
+  defaultExpanded,
+}: {
+  item: OutlineItem;
+  currentPage: number;
+  goTo: (page: number) => void;
+  depth: number;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded ?? depth < 1);
+  const hasChildren = item.items.length > 0;
+
+  // Determine if this item (or any descendant) covers the current page
+  const isActive = item.pageNumber === currentPage;
+
+  return (
+    <div>
+      <div className="flex items-start gap-0.5">
+        {hasChildren ? (
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-accent/50"
+          >
+            <ChevronRight
+              className={cn(
+                "h-3 w-3 transition-transform",
+                expanded && "rotate-90",
+              )}
+            />
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
+        <button
+          onClick={() => goTo(item.pageNumber)}
+          className={cn(
+            "flex-1 rounded-sm px-1.5 py-1 text-left text-[12px] leading-snug transition-colors",
+            isActive
+              ? "bg-accent text-accent-foreground font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent/40",
+          )}
+          title={`${item.title} — Page ${item.pageNumber}`}
+        >
+          {item.title}
+        </button>
+      </div>
+      {hasChildren && expanded && (
+        <OutlineTree items={item.items} currentPage={currentPage} goTo={goTo} depth={depth + 1} defaultExpanded={defaultExpanded} />
+      )}
+    </div>
+  );
+}
+
 function annotationKindLabel(kind: "highlight" | "note") {
   return kind === "note" ? "Note" : "Highlight";
 }
@@ -160,7 +282,6 @@ function annotationToneClass(kind: "highlight" | "note") {
 export function PdfViewer({
   paperId,
   onToggleChat,
-  onViewSummary,
   chatOpen,
   onReturnToChat,
 }: PdfViewerProps) {
@@ -184,8 +305,15 @@ export function PdfViewer({
   const [zoom, setZoom] = useState(100);
   const [fitMode, setFitMode] = useState<"width" | "height" | null>("height");
 
+  // Outline / TOC
+  const [outline, setOutline] = useState<OutlineItem[]>([]);
+
   // UI state
   const [sidebar, setSidebar] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"thumbnails" | "outline">("thumbnails");
+  // Bump generation to force re-mount OutlineTree with a new defaultExpanded
+  const [outlineGen, setOutlineGen] = useState(0);
+  const [outlineExpanded, setOutlineExpanded] = useState(true); // current default for all nodes
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [twoCol, setTwoCol] = useState(false);
@@ -338,7 +466,11 @@ export function PdfViewer({
 
   // Document loaded
   const onDocLoad = useCallback(
-    (doc: { numPages: number }) => setNumPages(doc.numPages),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (doc: any) => {
+      setNumPages(doc.numPages);
+      resolveOutline(doc).then(setOutline).catch(() => setOutline([]));
+    },
     [],
   );
 
@@ -1006,27 +1138,12 @@ export function PdfViewer({
   return (
     <div className="relative flex h-full flex-col bg-background">
       <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/40 bg-card/80 px-2 backdrop-blur-md">
-        {onViewSummary && (
-          <>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onViewSummary}
-              className="gap-1.5"
-              title="Back to summary"
-            >
-              <AlignLeft className="h-3.5 w-3.5" />
-              <span className="text-xs">Summary</span>
-            </Button>
-            <Sep />
-          </>
-        )}
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={() => setSidebar((s) => !s)}
           className={cn(sidebar && "bg-accent")}
-          title="Toggle thumbnails"
+          title="Toggle sidebar"
         >
           <PanelLeft className="h-3.5 w-3.5" />
         </Button>
@@ -1205,37 +1322,100 @@ export function PdfViewer({
         className="flex min-h-0 flex-1 overflow-hidden"
       >
         {sidebar && (
-          <div className="w-[140px] shrink-0 overflow-y-auto border-r border-border/30 bg-muted/10 p-2">
-            {pages.map((n) => (
+          <div className={cn(
+            "shrink-0 flex flex-col border-r border-border/30 bg-muted/10",
+            sidebarTab === "outline" ? "w-[260px]" : "w-[140px]",
+          )}>
+            {/* Sidebar tab switcher */}
+            <div className="flex shrink-0 border-b border-border/30">
               <button
-                key={n}
-                onClick={() => goTo(n)}
+                onClick={() => setSidebarTab("thumbnails")}
                 className={cn(
-                  "mb-2 w-full cursor-pointer rounded-md p-1.5 transition-all",
-                  currentPage === n
-                    ? "bg-accent ring-1 ring-ring/40"
-                    : "hover:bg-accent/50",
+                  "flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] transition-colors",
+                  sidebarTab === "thumbnails"
+                    ? "bg-accent/60 text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
                 )}
+                title="Page thumbnails"
               >
-                <Page
-                  pageNumber={n}
-                  width={112}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  className="pointer-events-none"
-                />
-                <span
-                  className={cn(
-                    "mt-1 block text-[10px] tabular-nums transition-colors",
-                    currentPage === n
-                      ? "text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {n}
-                </span>
+                <Image className="h-3.5 w-3.5" />
               </button>
-            ))}
+              <button
+                onClick={() => setSidebarTab("outline")}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 py-1.5 text-[11px] transition-colors",
+                  sidebarTab === "outline"
+                    ? "bg-accent/60 text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/30",
+                )}
+                title="Table of contents"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Sidebar content */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {sidebarTab === "thumbnails" ? (
+                pages.map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => goTo(n)}
+                    className={cn(
+                      "mb-2 w-full cursor-pointer rounded-md p-1.5 transition-all",
+                      currentPage === n
+                        ? "bg-accent ring-1 ring-ring/40"
+                        : "hover:bg-accent/50",
+                    )}
+                  >
+                    <Page
+                      pageNumber={n}
+                      width={112}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                      className="pointer-events-none"
+                    />
+                    <span
+                      className={cn(
+                        "mt-1 block text-[10px] tabular-nums transition-colors",
+                        currentPage === n
+                          ? "text-foreground"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {n}
+                    </span>
+                  </button>
+                ))
+              ) : outline.length > 0 ? (
+                <>
+                  <div className="mb-1.5 flex items-center justify-end">
+                    <button
+                      onClick={() => {
+                        const next = !outlineExpanded;
+                        setOutlineExpanded(next);
+                        setOutlineGen((g) => g + 1);
+                      }}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors"
+                      title={outlineExpanded ? "Collapse all" : "Expand all"}
+                    >
+                      {outlineExpanded ? (
+                        <ChevronsDownUp className="h-3 w-3" />
+                      ) : (
+                        <ChevronsUpDown className="h-3 w-3" />
+                      )}
+                      <span>{outlineExpanded ? "Collapse" : "Expand"}</span>
+                    </button>
+                  </div>
+                  <OutlineTree key={outlineGen} items={outline} currentPage={currentPage} goTo={goTo} defaultExpanded={outlineExpanded} />
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+                  <FileText className="h-6 w-6 opacity-40" />
+                  <span className="text-xs">No table of contents</span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

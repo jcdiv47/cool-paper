@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { useConvexChat } from "@/hooks/use-convex-chat";
 import { ChatView } from "@/components/chat-view";
@@ -38,10 +38,22 @@ export function PaperChatDrawer({
   scrollToRefId,
 }: PaperChatDrawerProps) {
   const chat = useConvexChat();
+  const router = useRouter();
   const existingThread = useQuery(api.threads.getByPaperId, { paperId });
   const initializedRef = useRef(false);
   const searchParams = useSearchParams();
   const activeCiteRefId = searchParams.get("cite") ?? undefined;
+
+  const handleGoToChat = useCallback(() => {
+    if (chat.threadId) {
+      router.push(`/chat/${chat.threadId}`);
+    }
+  }, [chat.threadId, router]);
+
+  const handleNewChat = useCallback(async () => {
+    const newThreadId = await chat.createThread([paperId]);
+    router.push(`/chat/${newThreadId}`);
+  }, [chat, paperId, router]);
 
   // On mount / when existingThread resolves, load or prepare the thread
   useEffect(() => {
@@ -77,6 +89,8 @@ export function PaperChatDrawer({
       hidePaperCards
       activeCiteRefId={activeCiteRefId}
       scrollToRefId={scrollToRefId}
+      onGoToChat={chat.threadId ? handleGoToChat : undefined}
+      onNewChat={handleNewChat}
     />
   );
 
