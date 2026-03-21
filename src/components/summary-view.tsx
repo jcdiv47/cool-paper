@@ -137,8 +137,8 @@ export function SummaryView({
               <p
                 className={
                   compact
-                    ? "font-serif text-[1rem] leading-[1.8] text-foreground/85"
-                    : "font-serif text-[1.05rem] leading-[1.85] text-foreground/85 sm:text-lg sm:leading-[1.9]"
+                    ? "font-serif text-[0.85rem] leading-[1.75] text-foreground/85"
+                    : "font-serif text-[0.9rem] leading-[1.8] text-foreground/85 sm:text-[0.95rem] sm:leading-[1.8]"
                 }
               >
                 {paper.abstract}
