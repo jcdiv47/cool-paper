@@ -84,7 +84,11 @@ export function ModelPickerDialog({
 
         <ScrollArea className="max-h-[65vh]">
           <div className="space-y-3 px-4 py-4 sm:px-6">
-            {models.map((model) => {
+            {[...models].sort((a, b) => {
+              if (a.id === selectedModel) return -1;
+              if (b.id === selectedModel) return 1;
+              return 0;
+            }).map((model) => {
               const selected = model.id === selectedModel;
               const disabledCard = disabled || model.availability === "unavailable";
               const availabilityNote = formatAvailabilityNote(model.availability);
