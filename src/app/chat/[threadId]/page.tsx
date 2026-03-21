@@ -16,8 +16,8 @@ import type { PaperMetadata } from "@/types";
 function ChatSkeleton() {
   return (
     <div className="mx-auto max-w-3xl space-y-3 px-4 py-8 sm:px-8">
-      <div className="h-4 w-3/4 animate-pulse rounded bg-muted/30" />
-      <div className="h-4 w-1/2 animate-pulse rounded bg-muted/30" />
+      <div className="h-4 w-3/4 animate-pulse rounded-lg bg-muted/20" />
+      <div className="h-4 w-1/2 animate-pulse rounded-lg bg-muted/20" />
     </div>
   );
 }
@@ -117,14 +117,20 @@ export default function ActiveChatPage({
         <Header fullWidth breadcrumbs={[{ label: "Chats", href: "/chat" }, { label: "..." }]}>
           <Skeleton className="h-5 w-48" />
         </Header>
-        <div className="flex-1 animate-pulse bg-muted/20" />
+        <div className="flex-1 animate-pulse bg-muted/10" />
       </div>
     );
   }
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
-      <Toaster richColors position="bottom-right" />
+      <Toaster
+        richColors
+        position="bottom-right"
+        toastOptions={{
+          className: "!rounded-xl !border-border/60 !bg-card/95 !backdrop-blur-xl",
+        }}
+      />
       <Header
         fullWidth
         breadcrumbs={[

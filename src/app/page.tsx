@@ -79,7 +79,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Toaster richColors position="bottom-right" />
+      <Toaster
+        richColors
+        position="bottom-right"
+        toastOptions={{
+          className: "!rounded-xl !border-border/60 !bg-card/95 !backdrop-blur-xl",
+        }}
+      />
       <Header>
         <Button
           size="sm"
@@ -88,32 +94,32 @@ export default function Home() {
         >
           <Plus className="h-4 w-4" />
           Add Paper
-          <kbd className="pointer-events-none ml-1 hidden h-5 select-none items-center rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1 font-mono text-[10px] font-medium opacity-60 sm:inline-flex">
+          <kbd className="pointer-events-none ml-1 hidden h-5 select-none items-center rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-1 font-mono text-[10px] font-medium opacity-60 sm:inline-flex">
             ⌘K
           </kbd>
         </Button>
       </Header>
-      <main className="mx-auto max-w-7xl px-4 py-10 pb-20 sm:px-6 sm:pb-10">
+      <main className="mx-auto max-w-7xl px-4 py-10 pb-24 sm:px-6 sm:pb-10">
         {loading ? (
           <div className="space-y-8">
             <div className="space-y-3">
-              <div className="h-10 w-full max-w-md animate-shimmer rounded-lg" />
-              <div className="h-3 w-24 animate-shimmer rounded" />
+              <div className="h-10 w-full max-w-md animate-shimmer rounded-xl" />
+              <div className="h-3 w-24 animate-shimmer rounded-lg" />
             </div>
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
-                  className="animate-card-enter border border-border/20 p-5"
+                  className="animate-card-enter rounded-xl border border-border/20 p-5"
                   style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div className="space-y-3">
-                    <div className="h-3 w-20 animate-shimmer rounded" />
-                    <div className="h-5 w-3/4 animate-shimmer rounded" />
-                    <div className="h-3 w-1/2 animate-shimmer rounded" />
+                    <div className="h-3 w-20 animate-shimmer rounded-lg" />
+                    <div className="h-5 w-3/4 animate-shimmer rounded-lg" />
+                    <div className="h-3 w-1/2 animate-shimmer rounded-lg" />
                     <div className="space-y-1.5">
-                      <div className="h-3 w-full animate-shimmer rounded" />
-                      <div className="h-3 w-5/6 animate-shimmer rounded" />
+                      <div className="h-3 w-full animate-shimmer rounded-lg" />
+                      <div className="h-3 w-5/6 animate-shimmer rounded-lg" />
                     </div>
                   </div>
                 </div>
@@ -122,14 +128,21 @@ export default function Home() {
           </div>
         ) : (
           <div className="space-y-16">
-            {/* Hero heading + inline stats */}
-            <section>
-              <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                Library
-              </h1>
+            {/* Hero heading + stats + heatmap */}
+            <section className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="shrink-0">
+                <h1 className="font-serif text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+                  Library
+                </h1>
+                {papers.length > 0 && (
+                  <div className="mt-3">
+                    <StatsBlock papers={papers} />
+                  </div>
+                )}
+              </div>
               {papers.length > 0 && (
-                <div className="mt-2">
-                  <StatsBlock papers={papers} />
+                <div className="min-w-0 flex-1 lg:max-w-[60%]">
+                  <ActivityHeatmap papers={papers} />
                 </div>
               )}
             </section>
@@ -144,7 +157,7 @@ export default function Home() {
                   {papers.length > 6 && (
                     <Link
                       href="/paper"
-                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-all hover:bg-muted/40 hover:text-primary"
                     >
                       View all
                       <ArrowRight className="h-3 w-3" />
@@ -161,8 +174,10 @@ export default function Home() {
                 </div>
               </div>
               {recentPapers.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-6 border border-border bg-card py-24 text-center">
-                  <BookOpen className="h-10 w-10 text-muted-foreground/20" />
+                <div className="flex flex-col items-center justify-center gap-6 rounded-2xl border border-dashed border-border/50 bg-card/50 py-24 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                    <BookOpen className="h-8 w-8 text-primary/50" />
+                  </div>
                   <div className="space-y-2">
                     <p className="font-serif text-lg font-semibold text-foreground">
                       Your library is empty
@@ -191,24 +206,15 @@ export default function Home() {
               )}
             </section>
 
-            {/* Activity */}
-            {papers.length > 0 && (
-              <section>
-                <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Activity
-                </h2>
-                <ActivityHeatmap papers={papers} />
-              </section>
-            )}
           </div>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
+      <footer className="border-t border-border/30 py-8">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
-          <span className="font-serif text-xs text-muted-foreground/40">Cool Paper</span>
-          <span className="text-[11px] text-muted-foreground/30">
+          <span className="font-serif text-xs text-muted-foreground/30">Cool Paper</span>
+          <span className="text-[11px] text-muted-foreground/20">
             Immersive arXiv reader
           </span>
         </div>

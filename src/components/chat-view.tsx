@@ -146,7 +146,7 @@ function ThinkingCard({
       onOpenChange={(open) => setManualOpen(open)}
       className="mb-3"
     >
-      <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
+      <CollapsibleTrigger className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition-all hover:bg-muted/30 hover:text-foreground">
         <ChevronRight
           className={`h-3 w-3 transition-transform ${isOpen ? "rotate-90" : ""}`}
         />
@@ -160,7 +160,7 @@ function ThinkingCard({
         <div
           ref={thinkingScrollRef}
           onScroll={handleThinkingScroll}
-          className="mt-2 max-h-60 overflow-y-auto rounded-md border border-border/30 bg-muted/15 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
+          className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-border/30 bg-muted/10 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-muted-foreground"
         >
           {thinking}
         </div>
@@ -185,7 +185,7 @@ function AssistantMessage({
   return (
     <div className="w-full">
       {message.model && (
-        <span className="mb-1 block text-[10px] text-muted-foreground/50">
+        <span className="mb-1.5 block text-[10px] font-medium text-muted-foreground/40">
           {getModelLabel(message.model)}
         </span>
       )}
@@ -230,7 +230,7 @@ function StreamingAssistantMessage({
   return (
     <div className="w-full">
       {message.model && (
-        <span className="mb-1 block text-[10px] text-muted-foreground/50">
+        <span className="mb-1.5 block text-[10px] font-medium text-muted-foreground/40">
           {getModelLabel(message.model)}
         </span>
       )}
@@ -460,7 +460,7 @@ export function ChatView({
         >
           {msg.role === "user" ? (
             <div className="flex justify-end">
-              <div className="max-w-[85%] rounded-lg border-l-2 border-primary/30 bg-primary/8 px-4 py-2.5">
+              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 ring-1 ring-primary/15">
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">
                   {msg.content}
                 </p>
@@ -491,7 +491,7 @@ export function ChatView({
     <div className="flex h-full flex-col">
       {/* Paper cards row */}
       {!hidePaperCards && papers && papers.length > 0 && onRemovePaper && onAddPaperClick && (
-        <div className="border-b border-border/40">
+        <div className="border-b border-border/30">
           <div className="mx-auto max-w-3xl">
             <PaperCardRow
               papers={papers}
@@ -507,7 +507,9 @@ export function ChatView({
         <div className="mx-auto max-w-3xl px-4 py-6 sm:px-8">
           {!hasConversation ? (
             <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
-              <MessageCircle className="h-8 w-8 text-muted-foreground/30" />
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                <MessageCircle className="h-6 w-6 text-primary/50" />
+              </div>
               <div className="space-y-2">
                 <p className="text-base font-semibold text-foreground">
                   {emptyHeading}
@@ -523,7 +525,7 @@ export function ChatView({
                     variant="outline"
                     size="sm"
                     onClick={() => onSendMessage(s)}
-                    className="border-border font-normal text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    className="rounded-full border-border/50 font-normal text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-foreground"
                   >
                     {s}
                   </Button>
@@ -552,7 +554,7 @@ export function ChatView({
           )}
 
           {error && (
-            <div className="mt-4 rounded-[4px] border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
+            <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-2.5 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -560,13 +562,13 @@ export function ChatView({
       </div>
 
       {/* Input area */}
-      <div className="border-t border-border/40 bg-background">
+      <div className="border-t border-border/30 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 py-3 sm:px-8">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="h-10 shrink-0 gap-2 rounded-[6px] px-3 text-left"
+            className="h-10 shrink-0 gap-2 rounded-xl px-3 text-left"
             onClick={() => setModelPickerOpen(true)}
             disabled={isStreaming}
           >
@@ -583,14 +585,14 @@ export function ChatView({
             onKeyDown={handleKeyDown}
             placeholder={placeholderText}
             rows={1}
-            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-[6px] border border-border bg-secondary px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary focus:bg-background"
+            className="min-h-[40px] max-h-[160px] flex-1 resize-none rounded-xl border border-border/50 bg-secondary/50 px-4 py-2.5 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/40 focus:border-primary/40 focus:bg-background focus:ring-2 focus:ring-primary/15"
             disabled={isStreaming}
           />
           {isStreaming ? (
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 shrink-0"
+              className="h-10 w-10 shrink-0 rounded-xl"
               onClick={onCancel}
             >
               <Square className="h-4 w-4" />
@@ -598,7 +600,7 @@ export function ChatView({
           ) : (
             <Button
               size="icon"
-              className={`h-10 w-10 shrink-0 transition-colors ${input.trim() ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-transparent text-muted-foreground hover:bg-secondary"}`}
+              className={`h-10 w-10 shrink-0 rounded-xl transition-all ${input.trim() ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90" : "bg-transparent text-muted-foreground shadow-none hover:bg-secondary"}`}
               onClick={handleSubmit}
               disabled={!input.trim()}
             >

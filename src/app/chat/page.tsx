@@ -46,7 +46,13 @@ export default function ChatInboxPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Toaster richColors position="bottom-right" />
+      <Toaster
+        richColors
+        position="bottom-right"
+        toastOptions={{
+          className: "!rounded-xl !border-border/60 !bg-card/95 !backdrop-blur-xl",
+        }}
+      />
       <Header pageTitle="Chats">
         <Button
           size="sm"
@@ -57,7 +63,7 @@ export default function ChatInboxPage() {
           New Chat
         </Button>
       </Header>
-      <main className="mx-auto max-w-2xl px-4 py-8 pb-20 sm:px-6 sm:pb-8">
+      <main className="mx-auto max-w-2xl px-4 py-8 pb-24 sm:px-6 sm:pb-8">
         <ThreadList
           threads={threads}
           loading={loading}

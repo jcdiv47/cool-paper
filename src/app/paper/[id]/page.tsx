@@ -39,7 +39,7 @@ import { parseImportStatus, stageLabel } from "@/lib/import-status";
 import type { PaperMetadata } from "@/types";
 
 function PdfSkeleton() {
-  return <div className="flex h-full items-center justify-center bg-muted/20 animate-pulse" />;
+  return <div className="flex h-full items-center justify-center bg-muted/10 animate-pulse" />;
 }
 
 const LazyPdfViewer = dynamic(
@@ -216,7 +216,7 @@ export default function PaperPage({
         <Header fullWidth breadcrumbs={[{ label: "Papers", href: "/paper" }, { label: "..." }]}>
           <Skeleton className="h-8 w-28" />
         </Header>
-        <div className="flex-1 animate-pulse bg-muted/20" />
+        <div className="flex-1 animate-pulse bg-muted/10" />
       </div>
     );
   }
@@ -225,7 +225,13 @@ export default function PaperPage({
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
-      <Toaster richColors position="bottom-right" />
+      <Toaster
+        richColors
+        position="bottom-right"
+        toastOptions={{
+          className: "!rounded-xl !border-border/60 !bg-card/95 !backdrop-blur-xl",
+        }}
+      />
       <Header
         fullWidth
         breadcrumbs={[
@@ -236,22 +242,22 @@ export default function PaperPage({
 
       {/* Import status banner */}
       {paper.importState.phase === "importing" && (
-        <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 bg-secondary/40 px-4 py-2 text-sm text-muted-foreground backdrop-blur-sm">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           <span className="font-mono text-xs">{stageLabel(paper.importState.stage)}</span>
         </div>
       )}
       {paper.importState.phase === "failed" && (
-        <div className="flex items-center gap-3 bg-destructive/5 px-4 py-2 text-sm">
+        <div className="flex items-center gap-3 bg-destructive/5 px-4 py-2 text-sm backdrop-blur-sm">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" />
           <span className="min-w-0 flex-1 truncate font-mono text-xs text-destructive">
             {paper.importState.error}
           </span>
-          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={handleRetry}>
+          <Button variant="ghost" size="sm" className="h-7 gap-1 rounded-lg text-xs" onClick={handleRetry}>
             <RotateCcw className="h-3 w-3" />
             Retry
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-destructive" onClick={handleDeletePaper}>
+          <Button variant="ghost" size="sm" className="h-7 gap-1 rounded-lg text-xs text-destructive" onClick={handleDeletePaper}>
             <Trash2 className="h-3 w-3" />
             Delete
           </Button>
@@ -259,7 +265,7 @@ export default function PaperPage({
       )}
 
       {/* Main content */}
-      <main className="min-h-0 flex-1 overflow-hidden bg-muted/10">
+      <main className="min-h-0 flex-1 overflow-hidden bg-muted/5">
         {view === "pdf" ? (
           <LazyPdfViewer
             paperId={id}
@@ -294,11 +300,11 @@ export default function PaperPage({
       {!isDesktop && (
         <>
           <div className="pointer-events-none fixed inset-x-0 bottom-14 z-30 px-4 pb-2 sm:hidden">
-            <div className="pointer-events-auto mx-auto flex max-w-sm items-center justify-center rounded-[6px] border border-border/60 bg-background/92 p-1.5 shadow-lg backdrop-blur">
+            <div className="pointer-events-auto mx-auto flex max-w-sm items-center justify-center rounded-2xl border border-border/40 bg-background/80 p-1.5 shadow-lg backdrop-blur-xl">
               <Button
                 variant={mobilePanel === "chat" ? "secondary" : "ghost"}
                 size="sm"
-                className="flex-1 gap-1.5"
+                className="flex-1 gap-1.5 rounded-xl"
                 onClick={() => setMobilePanel(mobilePanel === "chat" ? null : "chat")}
               >
                 <MessageCircle className="h-3.5 w-3.5" />
@@ -310,7 +316,7 @@ export default function PaperPage({
           <Sheet open={mobilePanel === "chat"} onOpenChange={(open) => !open && setMobilePanel(null)}>
             <SheetContent
               side="bottom"
-              className="h-[78vh] rounded-t-[8px] border-border/60 bg-background p-0 sm:hidden"
+              className="h-[78vh] rounded-t-2xl border-border/40 bg-background p-0 sm:hidden"
               showCloseButton={false}
             >
               <SheetHeader className="sr-only">

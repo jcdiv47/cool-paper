@@ -58,16 +58,18 @@ export function StatsBlock({ papers }: StatsBlockProps) {
   }, [chatCount]);
 
   return (
-    <p className="text-sm text-muted-foreground">
-      <span className="font-medium text-foreground">{paperCount}</span> paper{paperCount !== 1 ? "s" : ""}
-      {" · "}
-      <span className="font-medium text-foreground">{categoryCount}</span> topic{categoryCount !== 1 ? "s" : ""}
+    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-3 py-1">
+        <span className="font-semibold text-foreground">{paperCount}</span> paper{paperCount !== 1 ? "s" : ""}
+      </span>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-3 py-1">
+        <span className="font-semibold text-foreground">{categoryCount}</span> topic{categoryCount !== 1 ? "s" : ""}
+      </span>
       {chatCount !== null && (
-        <>
-          {" · "}
-          <span className="font-medium text-foreground">{chatCount}</span> chat{chatCount !== 1 ? "s" : ""}
-        </>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-3 py-1">
+          <span className="font-semibold text-foreground">{chatCount}</span> chat{chatCount !== 1 ? "s" : ""}
+        </span>
       )}
-    </p>
+    </div>
   );
 }

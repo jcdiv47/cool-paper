@@ -36,30 +36,33 @@ export function Header({
   const backCrumb = breadcrumbs?.find((b) => b.href);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/70 backdrop-blur-2xl backdrop-saturate-150">
       <div
-        className={`flex h-12 items-center gap-4 px-4 sm:px-6 ${fullWidth ? "" : "mx-auto max-w-7xl"}`}
+        className={`flex h-14 items-center gap-4 px-4 sm:px-6 ${fullWidth ? "" : "mx-auto max-w-7xl"}`}
       >
         <Link
           href="/"
           className="flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80"
         >
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15">
+            <span className="text-sm font-bold text-primary">C</span>
+          </div>
           <span className="font-serif text-[15px] font-semibold tracking-tight">
-            <span className="text-primary">C</span>ool Paper
+            Cool Paper
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-0.5 sm:flex">
+        <nav className="hidden items-center gap-1 sm:flex">
           {DESKTOP_NAV.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
                   isActive
-                    ? "border-b-2 border-primary text-foreground"
-                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                 }`}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -119,7 +122,7 @@ export function Header({
               value={search ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="h-8 pl-9 text-sm"
+              className="h-8 rounded-full pl-9 text-sm"
             />
           </div>
         )}

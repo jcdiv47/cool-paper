@@ -98,7 +98,7 @@ export function PaperPickerDialog({
         {loading ? (
           <div className="space-y-2 p-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded-md bg-muted" />
+              <div key={i} className="h-10 animate-pulse rounded-lg bg-muted" />
             ))}
           </div>
         ) : (
@@ -115,11 +115,11 @@ export function PaperPickerDialog({
                     key={paper.arxivId}
                     value={`${paper.title} ${paper.authors.join(" ")} ${paper.arxivId}`}
                     onSelect={() => handleSelect(paper.arxivId)}
-                    className="flex items-start gap-3 py-2.5"
+                    className="flex items-start gap-3 rounded-lg py-2.5"
                   >
                     {multi && (
                       <div
-                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-md border transition-colors ${
                           isSelected
                             ? "border-primary bg-primary text-primary-foreground"
                             : "border-border"
@@ -134,13 +134,13 @@ export function PaperPickerDialog({
                           {paper.title}
                         </p>
                         {paper.importState.phase === "importing" && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                             <Loader2 className="h-2.5 w-2.5 animate-spin" />
                             {stageLabel(paper.importState.stage)}
                           </span>
                         )}
                         {paper.importState.phase === "failed" && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-destructive">
                             <AlertTriangle className="h-2.5 w-2.5" />
                             Failed
                           </span>
@@ -159,10 +159,10 @@ export function PaperPickerDialog({
         )}
       </CommandList>
       {multi && selected.size > 0 && (
-        <div className="border-t p-2 flex justify-end">
+        <div className="border-t border-border/40 p-2 flex justify-end">
           <button
             onClick={handleConfirm}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            className="rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25"
           >
             Add {selected.size} paper{selected.size > 1 ? "s" : ""}
           </button>

@@ -76,10 +76,11 @@ export function AddPaperDialog({
               placeholder="e.g. 2301.07041 or https://arxiv.org/abs/2301.07041"
               disabled={loading}
               autoFocus
+              className="rounded-xl"
             />
           </div>
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="rounded-lg bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
           <div className="flex justify-end gap-2">
             <Button

@@ -91,13 +91,13 @@ export function SummaryView({
             {paper.title}
           </h1>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground/50">
             <time className="font-mono">{formattedDate}</time>
             <span className="font-mono">{paper.arxivId}</span>
             {paper.categories.map((cat) => (
               <span
                 key={cat}
-                className="rounded-md border border-border/60 bg-transparent px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                className="rounded-full border border-border/50 bg-muted/20 px-2 py-px font-mono text-[10px] text-muted-foreground"
               >
                 {cat}
               </span>
@@ -107,7 +107,7 @@ export function SummaryView({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 gap-1 px-2 text-[10px]"
+                  className="h-7 gap-1 rounded-lg px-2.5 text-[11px]"
                   onClick={onViewPdf}
                 >
                   <FileText className="h-3 w-3" />
@@ -117,7 +117,7 @@ export function SummaryView({
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 gap-1 px-2 text-[10px]"
+                className="h-7 gap-1 rounded-lg px-2.5 text-[11px]"
                 onClick={() => router.push(`/chat/new?paperIds=${sanitizedId}`)}
               >
                 <MessageCircle className="h-3 w-3" />
@@ -126,12 +126,12 @@ export function SummaryView({
             </div>
           </div>
 
-          <div className={compact ? "my-6 h-px bg-border" : "my-8 h-px bg-border"} />
+          <div className={compact ? "my-6 h-px bg-border/40" : "my-8 h-px bg-border/40"} />
 
           {/* Abstract */}
           {paper.abstract && (
             <div className={summary ? (compact ? "mb-6" : "mb-8") : undefined}>
-              <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/50">
+              <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/40">
                 Abstract
               </h2>
               <p

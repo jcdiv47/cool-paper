@@ -69,7 +69,7 @@ export function ModelPickerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-border/50 px-6 py-5">
+        <DialogHeader className="border-b border-border/40 px-6 py-5">
           <DialogTitle>Choose model</DialogTitle>
           <DialogDescription className="flex flex-wrap items-center gap-2">
             <span>Metadata from OpenRouter for the models available in chat.</span>
@@ -99,13 +99,13 @@ export function ModelPickerDialog({
                     onOpenChange(false);
                   }}
                   className={cn(
-                    "group w-full border px-4 py-4 text-left transition-colors",
+                    "group w-full rounded-xl border px-4 py-4 text-left transition-all duration-200",
                     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     selected
-                      ? "border-primary/60 bg-primary/4"
-                      : "border-border/60 bg-background hover:border-foreground/20 hover:bg-muted/20",
+                      ? "border-primary/50 bg-primary/5 shadow-md shadow-primary/5"
+                      : "border-border/40 bg-card/40 hover:border-primary/20 hover:bg-card/80",
                     disabledCard &&
-                      "cursor-not-allowed opacity-60 hover:border-border/60 hover:bg-background",
+                      "cursor-not-allowed opacity-60 hover:border-border/40 hover:bg-card/40",
                   )}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -115,7 +115,7 @@ export function ModelPickerDialog({
                           {model.label}
                         </span>
                         {selected ? (
-                          <Badge variant="secondary" className="gap-1 rounded-[3px]">
+                          <Badge variant="secondary" className="gap-1">
                             <Check className="h-3 w-3" />
                             Selected
                           </Badge>
@@ -123,7 +123,7 @@ export function ModelPickerDialog({
                         {model.availability === "unavailable" ? (
                           <Badge
                             variant="outline"
-                            className="rounded-[3px] text-muted-foreground"
+                            className="text-muted-foreground"
                           >
                             Unavailable
                           </Badge>
@@ -139,7 +139,7 @@ export function ModelPickerDialog({
                   </div>
 
                   <div className="mt-4 grid gap-2 text-xs text-foreground sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
+                    <div className="rounded-lg bg-muted/15 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Cpu className="h-3.5 w-3.5" />
                         Context
@@ -148,7 +148,7 @@ export function ModelPickerDialog({
                         {formatModelTokenCount(model.contextLength)}
                       </div>
                     </div>
-                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
+                    <div className="rounded-lg bg-muted/15 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Sparkles className="h-3.5 w-3.5" />
                         Max output
@@ -157,7 +157,7 @@ export function ModelPickerDialog({
                         {formatModelTokenCount(model.maxCompletionTokens)}
                       </div>
                     </div>
-                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
+                    <div className="rounded-lg bg-muted/15 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Coins className="h-3.5 w-3.5" />
                         Input
@@ -166,7 +166,7 @@ export function ModelPickerDialog({
                         {formatModelPrice(model.promptPricePerMillionUsd)}
                       </div>
                     </div>
-                    <div className="rounded-[4px] bg-muted/20 px-3 py-2">
+                    <div className="rounded-lg bg-muted/15 px-3 py-2">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Coins className="h-3.5 w-3.5" />
                         Output
@@ -182,7 +182,7 @@ export function ModelPickerDialog({
                       <Badge
                         key={`in-${model.id}-${modality}`}
                         variant="outline"
-                        className="rounded-[3px] text-[11px] text-muted-foreground"
+                        className="text-[11px] text-muted-foreground"
                       >
                         In: {modality}
                       </Badge>
@@ -191,7 +191,7 @@ export function ModelPickerDialog({
                       <Badge
                         key={`out-${model.id}-${modality}`}
                         variant="outline"
-                        className="rounded-[3px] text-[11px] text-muted-foreground"
+                        className="text-[11px] text-muted-foreground"
                       >
                         Out: {modality}
                       </Badge>
@@ -200,7 +200,7 @@ export function ModelPickerDialog({
                     model.outputModalities.length === 0 ? (
                       <Badge
                         variant="outline"
-                        className="rounded-[3px] text-[11px] text-muted-foreground"
+                        className="text-[11px] text-muted-foreground"
                       >
                         Modalities unavailable
                       </Badge>
@@ -224,7 +224,7 @@ export function ModelPickerDialog({
           </div>
         </ScrollArea>
 
-        <div className="border-t border-border/50 bg-muted/10 px-6 py-4 text-xs text-muted-foreground">
+        <div className="border-t border-border/40 bg-muted/5 px-6 py-4 text-xs text-muted-foreground">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span>
               Metadata from OpenRouter. Last updated {formatLastUpdated(cache.fetchedAt)}.

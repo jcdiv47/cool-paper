@@ -45,7 +45,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 animate-pulse bg-muted/20" />
+          <div key={i} className="h-20 animate-pulse rounded-xl bg-muted/20" />
         ))}
       </div>
     );
@@ -54,7 +54,9 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
   if (threads.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
-        <MessageCircle className="h-8 w-8 text-muted-foreground/30" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+          <MessageCircle className="h-6 w-6 text-primary/50" />
+        </div>
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-foreground">No chats yet</p>
           <p className="text-sm text-muted-foreground">
@@ -73,7 +75,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
             <Button
               variant="ghost"
               onClick={() => onSelect(thread.id)}
-              className="flex h-auto w-full flex-col items-start gap-1.5 border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground transition-colors duration-200 hover:bg-secondary hover:text-foreground"
+              className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/40 bg-card/60 px-4 py-3.5 text-left font-normal text-foreground transition-all duration-200 hover:border-primary/20 hover:bg-card hover:text-foreground hover:shadow-md hover:shadow-primary/5"
             >
               <p className="text-sm font-medium leading-tight pr-8 transition-colors duration-300 group-hover:text-primary">{thread.title}</p>
               {thread.paperTitles.length > 0 && (
@@ -93,7 +95,7 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-3 h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100"
+              className="absolute right-2 top-3 h-7 w-7 rounded-lg opacity-0 transition-opacity group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
                 setDeleteTarget(thread.id);

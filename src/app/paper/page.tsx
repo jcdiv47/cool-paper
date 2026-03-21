@@ -50,7 +50,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 animate-pulse bg-muted/20" />
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-muted/20" />
         ))}
       </div>
     );
@@ -59,7 +59,9 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
   if (filtered.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 py-20 text-center">
-        <FileText className="h-8 w-8 text-muted-foreground/30" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+          <FileText className="h-6 w-6 text-primary/50" />
+        </div>
         <div className="space-y-1.5">
           <p className="text-sm font-semibold text-foreground">
             {papers.length === 0 ? "No papers yet" : "No matching papers"}
@@ -84,23 +86,23 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
               <Button
                 variant="ghost"
                 onClick={() => onSelect(sanitizedId)}
-                className="flex h-auto w-full flex-col items-start gap-1.5 border border-border bg-card px-4 py-3.5 text-left font-normal text-foreground whitespace-normal overflow-hidden transition-colors duration-200 hover:bg-secondary hover:text-foreground"
+                className="flex h-auto w-full flex-col items-start gap-1.5 rounded-xl border border-border/40 bg-card/60 px-4 py-3.5 text-left font-normal text-foreground whitespace-normal overflow-hidden transition-all duration-200 hover:border-primary/20 hover:bg-card hover:text-foreground hover:shadow-md hover:shadow-primary/5"
               >
                 <p className="text-sm font-semibold leading-tight pr-8 line-clamp-2 transition-colors duration-300 group-hover:text-primary">
                   {paper.title}
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <span className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/50">
+                  <span className="rounded-full bg-secondary/60 px-2 py-0.5 font-mono text-[10px] text-muted-foreground/50">
                     arXiv:{paper.arxivId}
                   </span>
                   {paper.importState.phase === "importing" && (
-                    <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                       {stageLabel(paper.importState.stage)}
                     </span>
                   )}
                   {paper.importState.phase === "failed" && (
-                    <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-destructive">
                       <AlertTriangle className="h-2.5 w-2.5" />
                       IMPORT FAILED
                     </span>
@@ -115,7 +117,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 rounded-lg"
                     onClick={(e) => {
                       e.stopPropagation();
                       onRetry(paper.arxivId);
@@ -127,7 +129,7 @@ function PaperList({ papers, loading, search, onSelect, onDelete, onRetry }: Pap
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-7 w-7 rounded-lg"
                   onClick={(e) => {
                     e.stopPropagation();
                     setDeleteTarget(paper.arxivId);
@@ -219,7 +221,13 @@ export default function PaperListPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Toaster richColors position="bottom-right" />
+      <Toaster
+        richColors
+        position="bottom-right"
+        toastOptions={{
+          className: "!rounded-xl !border-border/60 !bg-card/95 !backdrop-blur-xl",
+        }}
+      />
       <Header search={search} onSearchChange={setSearch} pageTitle="Papers">
         <Button
           size="sm"
@@ -230,7 +238,7 @@ export default function PaperListPage() {
           Add Paper
         </Button>
       </Header>
-      <main className="mx-auto max-w-2xl px-4 py-8 pb-20 sm:px-6 sm:pb-8">
+      <main className="mx-auto max-w-2xl px-4 py-8 pb-24 sm:px-6 sm:pb-8">
         <PaperList
           papers={papers}
           loading={loading}

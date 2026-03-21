@@ -22,7 +22,7 @@ export function PaperCardRow({ papers, onRemove, onAddClick }: PaperCardRowProps
         return (
           <div
             key={paper.arxivId}
-            className="group relative flex min-w-[200px] max-w-[220px] shrink-0 flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors duration-200 hover:bg-secondary"
+            className="group relative flex min-w-[200px] max-w-[220px] shrink-0 flex-col gap-1 rounded-xl border border-border/40 bg-card/60 px-3 py-2.5 transition-all duration-200 hover:bg-card hover:border-primary/20"
           >
             <p className="line-clamp-2 text-xs font-medium leading-tight">
               {paper.title}
@@ -38,7 +38,7 @@ export function PaperCardRow({ papers, onRemove, onAddClick }: PaperCardRowProps
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute -right-1.5 -top-1.5 h-5 w-5 border border-border bg-background opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full border border-border bg-background opacity-0 transition-opacity group-hover:opacity-100"
                 onClick={() => onRemove(sanitizedId)}
               >
                 <X className="h-3 w-3" />
@@ -50,7 +50,7 @@ export function PaperCardRow({ papers, onRemove, onAddClick }: PaperCardRowProps
       <Button
         variant="outline"
         onClick={onAddClick}
-        className="flex h-auto min-w-[120px] shrink-0 flex-col items-center justify-center gap-1 rounded-lg border-dashed px-3 py-2 font-normal text-muted-foreground/50 hover:text-foreground"
+        className="flex h-auto min-w-[120px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-dashed px-3 py-2 font-normal text-muted-foreground/50 hover:border-primary/30 hover:text-foreground"
       >
         <Plus className="h-4 w-4" />
         <span className="text-[10px]">Add Paper</span>

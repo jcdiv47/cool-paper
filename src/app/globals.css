@@ -40,49 +40,49 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: 0px;
-  --radius-md: 4px;
-  --radius-lg: 6px;
-  --radius-xl: 8px;
-  --radius-2xl: 0px;
-  --radius-3xl: 0px;
-  --radius-4xl: 0px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-3xl: 28px;
+  --radius-4xl: 34px;
 }
 
 :root {
   color-scheme: dark;
-  --radius: 0;
-  --background: oklch(0.10 0.012 260);
-  --foreground: oklch(0.93 0.006 260);
-  --card: oklch(0.14 0.012 260);
-  --card-foreground: oklch(0.93 0.006 260);
-  --popover: oklch(0.14 0.014 260);
-  --popover-foreground: oklch(0.93 0.006 260);
-  --primary: oklch(0.68 0.12 270);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.18 0.012 260);
-  --secondary-foreground: oklch(0.93 0.006 260);
-  --muted: oklch(0.18 0.010 260);
-  --muted-foreground: oklch(0.50 0.010 260);
-  --accent: oklch(0.20 0.014 260);
-  --accent-foreground: oklch(0.93 0.006 260);
-  --destructive: oklch(0.60 0.20 25);
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.68 0.12 270);
-  --chart-1: oklch(0.68 0.12 270);
-  --chart-2: oklch(0.65 0.12 180);
-  --chart-3: oklch(0.60 0.10 310);
-  --chart-4: oklch(0.65 0.08 150);
-  --chart-5: oklch(0.65 0.14 15);
-  --sidebar: oklch(0.12 0.012 260);
-  --sidebar-foreground: oklch(0.93 0.006 260);
-  --sidebar-primary: oklch(0.68 0.12 270);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.18 0.012 260);
-  --sidebar-accent-foreground: oklch(0.93 0.006 260);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.68 0.12 270);
+  --radius: 10px;
+  --background: oklch(0.11 0.008 260);
+  --foreground: oklch(0.95 0.004 260);
+  --card: oklch(0.145 0.008 260);
+  --card-foreground: oklch(0.95 0.004 260);
+  --popover: oklch(0.155 0.01 260);
+  --popover-foreground: oklch(0.95 0.004 260);
+  --primary: oklch(0.74 0.14 180);
+  --primary-foreground: oklch(0.13 0.02 180);
+  --secondary: oklch(0.19 0.008 260);
+  --secondary-foreground: oklch(0.93 0.004 260);
+  --muted: oklch(0.19 0.006 260);
+  --muted-foreground: oklch(0.55 0.008 260);
+  --accent: oklch(0.22 0.016 180);
+  --accent-foreground: oklch(0.95 0.004 260);
+  --destructive: oklch(0.62 0.22 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 11%);
+  --ring: oklch(0.74 0.14 180);
+  --chart-1: oklch(0.74 0.14 180);
+  --chart-2: oklch(0.68 0.13 145);
+  --chart-3: oklch(0.70 0.12 300);
+  --chart-4: oklch(0.70 0.10 60);
+  --chart-5: oklch(0.65 0.16 340);
+  --sidebar: oklch(0.125 0.008 260);
+  --sidebar-foreground: oklch(0.95 0.004 260);
+  --sidebar-primary: oklch(0.74 0.14 180);
+  --sidebar-primary-foreground: oklch(0.13 0.02 180);
+  --sidebar-accent: oklch(0.20 0.012 260);
+  --sidebar-accent-foreground: oklch(0.95 0.004 260);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.74 0.14 180);
 }
 
 @layer base {
@@ -96,11 +96,11 @@
 
 /* ─── Card entrance ─── */
 @keyframes card-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-card-enter {
-  animation: card-enter 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: card-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* ─── Shimmer loading ─── */
@@ -109,9 +109,16 @@
   100% { background-position: 200% 0; }
 }
 .animate-shimmer {
-  background: linear-gradient(90deg, oklch(0.16 0.012 260) 0%, oklch(0.22 0.012 260) 50%, oklch(0.16 0.012 260) 100%);
+  background: linear-gradient(90deg, oklch(0.16 0.008 260) 0%, oklch(0.24 0.012 260) 50%, oklch(0.16 0.008 260) 100%);
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* ─── Subtle glow ─── */
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* ─── Scroll fade mask ─── */
@@ -123,15 +130,16 @@
 /* ─── Prose overrides for chat ─── */
 .prose-chat {
   --tw-prose-headings: var(--foreground);
-  --tw-prose-body: oklch(0.85 0.004 260);
-  --tw-prose-links: oklch(0.68 0.12 270);
-  --tw-prose-code: oklch(0.80 0.04 270);
-  --tw-prose-pre-bg: oklch(0.12 0.012 260);
+  --tw-prose-body: oklch(0.86 0.004 260);
+  --tw-prose-links: oklch(0.74 0.14 180);
+  --tw-prose-code: oklch(0.78 0.06 180);
+  --tw-prose-pre-bg: oklch(0.13 0.008 260);
 }
 .prose-chat code:not(pre code) {
-  background: oklch(0.18 0.012 260);
-  padding: 0.15em 0.35em;
+  background: oklch(0.20 0.012 260);
+  padding: 0.15em 0.4em;
   font-size: 0.875em;
+  border-radius: 6px;
 }
 
 .prose .katex-display {
@@ -153,29 +161,30 @@
   margin-left: 0.125rem;
   background: var(--primary);
   vertical-align: text-bottom;
-  border-radius: 1px;
+  border-radius: 3px;
   animation: cursor-pulse 1.2s ease-in-out infinite;
 }
 
 .citation-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin: 0 0.12rem;
-  padding: 0.05rem 0.38rem;
-  border: 1px solid color-mix(in oklch, var(--primary) 24%, var(--border));
-  border-radius: 6px;
+  gap: 0.18rem;
+  margin: 0 0.08rem;
+  padding: 0.04rem 0.32rem;
+  border: 1px solid color-mix(in oklch, var(--primary) 28%, var(--border));
+  border-radius: 999px;
   background: color-mix(in oklch, var(--primary) 10%, transparent);
   color: var(--primary);
-  font-size: 0.78em;
+  font-size: 0.68em;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 .citation-chip:hover {
-  background: color-mix(in oklch, var(--primary) 16%, transparent);
-  border-color: color-mix(in oklch, var(--primary) 40%, var(--border));
+  background: color-mix(in oklch, var(--primary) 18%, transparent);
+  border-color: color-mix(in oklch, var(--primary) 45%, var(--border));
+  transform: translateY(-1px);
 }
 .citation-chip-missing {
   border-style: dashed;
@@ -187,8 +196,8 @@
   color: color-mix(in oklch, var(--chart-3) 70%, var(--foreground));
 }
 .annotation-chip:hover {
-  background: color-mix(in oklch, var(--chart-3) 16%, transparent);
-  border-color: color-mix(in oklch, var(--chart-3) 42%, var(--border));
+  background: color-mix(in oklch, var(--chart-3) 18%, transparent);
+  border-color: color-mix(in oklch, var(--chart-3) 45%, var(--border));
 }
 .annotation-chip-missing {
   border-style: dashed;
@@ -201,96 +210,106 @@
 }
 .react-pdf__Page__textContent.textLayer span::selection {
   color: transparent !important;
-  background: rgba(0, 100, 255, 0.3);
+  background: rgba(0, 200, 180, 0.3);
 }
 .react-pdf__Page__textContent.textLayer span::-moz-selection {
   color: transparent !important;
-  background: rgba(0, 100, 255, 0.3);
+  background: rgba(0, 200, 180, 0.3);
 }
 
 /* ─── PDF viewer ─── */
 .pdf-page-shadow {
-  background: oklch(0.14 0.012 260);
+  background: oklch(0.145 0.008 260);
+  border-radius: 8px;
 }
 .pdf-page-placeholder {
-  background: oklch(0.14 0.012 260);
+  background: oklch(0.145 0.008 260);
+  border-radius: 8px;
 }
 .pdf-dark-pages .react-pdf__Page__canvas {
   filter: invert(0.88) hue-rotate(180deg);
+  border-radius: 4px;
 }
 .pdf-match {
-  background: rgba(120, 130, 255, 0.35);
+  background: rgba(0, 200, 180, 0.3);
   padding: 0 1px;
+  border-radius: 2px;
 }
 .pdf-citation-focus {
-  background: rgba(120, 130, 255, 0.44) !important;
-  outline: 2px solid rgba(120, 130, 255, 0.55);
+  background: rgba(0, 200, 180, 0.38) !important;
+  outline: 2px solid rgba(0, 200, 180, 0.5);
+  border-radius: 2px;
   animation: citation-pulse 1.2s ease-out;
 }
 @keyframes citation-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(120, 130, 255, 0.5); }
-  70% { box-shadow: 0 0 0 6px rgba(120, 130, 255, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(120, 130, 255, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(0, 200, 180, 0.45); }
+  70% { box-shadow: 0 0 0 8px rgba(0, 200, 180, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 200, 180, 0); }
 }
 .pdf-annotation-highlight {
-  background: rgba(120, 130, 255, 0.30) !important;
-  border-bottom: 2px solid rgba(120, 130, 255, 0.50);
+  background: rgba(0, 200, 180, 0.25) !important;
+  border-bottom: 2px solid rgba(0, 200, 180, 0.45);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.2s ease;
 }
 .pdf-annotation-note {
-  background: rgba(73, 171, 255, 0.30) !important;
-  border-bottom: 2px solid rgba(73, 171, 255, 0.50);
+  background: rgba(0, 160, 220, 0.25) !important;
+  border-bottom: 2px solid rgba(0, 160, 220, 0.45);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.2s ease;
 }
 .pdf-annotation-active {
-  outline: 2px solid rgba(120, 130, 255, 0.60);
-  box-shadow: 0 0 0 4px rgba(120, 130, 255, 0.22);
+  outline: 2px solid rgba(0, 200, 180, 0.55);
+  box-shadow: 0 0 0 4px rgba(0, 200, 180, 0.18);
 }
 .pdf-selection-toolbar {
   position: fixed;
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem;
-  border: 1px solid color-mix(in oklch, var(--foreground) 10%, var(--border));
-  background: color-mix(in oklch, var(--card) 94%, transparent);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  gap: 0.4rem;
+  padding: 0.4rem;
+  border: 1px solid color-mix(in oklch, var(--foreground) 12%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--card) 92%, transparent);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.2);
   transform: translate(-50%, -100%);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(16px) saturate(1.5);
 }
 .annotation-card {
   border: 1px solid color-mix(in oklch, var(--foreground) 6%, var(--border));
-  background: color-mix(in oklch, var(--card) 88%, transparent);
-  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--card) 90%, transparent);
+  padding: 0.65rem 0.8rem;
   transition:
-    border-color 0.15s ease,
-    background-color 0.15s ease;
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .annotation-card:hover,
 .annotation-card:focus-visible {
-  border-color: color-mix(in oklch, var(--primary) 34%, var(--border));
+  border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
   background: color-mix(in oklch, var(--primary) 6%, var(--card));
+  box-shadow: 0 0 20px rgba(0, 200, 180, 0.05);
   outline: none;
 }
 .annotation-card:hover .annotation-card-delete {
   opacity: 1;
 }
 .annotation-card-active {
-  border-color: color-mix(in oklch, var(--primary) 44%, var(--border));
+  border-color: color-mix(in oklch, var(--primary) 50%, var(--border));
   background: color-mix(in oklch, var(--primary) 8%, var(--card));
+  box-shadow: 0 0 24px rgba(0, 200, 180, 0.08);
 }
 
 /* ─── Prose overrides for paper summary ─── */
 .prose-summary {
-  --tw-prose-body: oklch(0.78 0.004 260);
+  --tw-prose-body: oklch(0.80 0.004 260);
   --tw-prose-headings: var(--foreground);
-  --tw-prose-links: oklch(0.68 0.12 270);
-  --tw-prose-bold: oklch(0.90 0 0);
+  --tw-prose-links: oklch(0.74 0.14 180);
+  --tw-prose-bold: oklch(0.92 0 0);
   --tw-prose-counters: oklch(0.50 0 0);
-  --tw-prose-bullets: oklch(0.35 0 0);
+  --tw-prose-bullets: oklch(0.40 0.05 180);
   font-family: var(--font-serif);
   line-height: 1.9;
 }
@@ -303,8 +322,8 @@
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: oklch(0.50 0.06 270);
-  border-top: 1px solid oklch(0.22 0.012 260);
+  color: oklch(0.55 0.08 180);
+  border-top: 1px solid oklch(0.22 0.008 260);
   padding-top: 2.5rem;
   margin-top: 3.5rem;
   margin-bottom: 1.75rem;
@@ -336,13 +355,14 @@
   margin-bottom: 0.5em;
 }
 .prose-summary code:not(pre code) {
-  background: oklch(0.16 0.012 260);
-  padding: 0.1em 0.3em;
+  background: oklch(0.18 0.012 260);
+  padding: 0.1em 0.35em;
   font-size: 0.85em;
   font-family: var(--font-mono);
+  border-radius: 6px;
 }
 .prose-summary blockquote {
-  border-left-color: oklch(0.30 0.06 270);
+  border-left-color: oklch(0.40 0.10 180);
   color: oklch(0.65 0 0);
   font-style: italic;
 }
@@ -357,14 +377,17 @@
   to { transform: translateX(100%); opacity: 0; }
 }
 .animate-slide-in-right {
-  animation: slide-in-right 0.2s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: slide-in-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .animate-slide-out-right {
-  animation: slide-out-right 0.2s cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: slide-out-right 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
 /* ─── Cal-heatmap ─── */
 .cal-heatmap-container rect:not([fill]) {
   fill: var(--secondary) !important;
+  rx: 3;
+  ry: 3;
 }
 .cal-heatmap-container text {
   fill: var(--muted-foreground) !important;
@@ -374,9 +397,22 @@
   background: var(--card) !important;
   color: var(--foreground) !important;
   border: 1px solid var(--border) !important;
-  border-radius: 0 !important;
+  border-radius: 10px !important;
   font-size: 12px !important;
-  padding: 6px 10px !important;
+  padding: 8px 12px !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* ─── Glass surface utility ─── */
+.glass-surface {
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+/* ─── Glow ring on focus ─── */
+.glow-ring:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--primary) 20%, transparent);
 }
 
 /* ─── Reduced motion ─── */
