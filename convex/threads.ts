@@ -44,20 +44,27 @@ export const list = query({
       .order("desc")
       .collect();
 
+    // Collect all unique paper sanitizedIds across all threads (deduplicated)
+    const allPaperIds = new Set<string>();
+    for (const t of threads) {
+      if (!t.messageCount) continue;
+      for (const pid of t.paperIds) allPaperIds.add(pid);
+    }
+
+    // Batch lookup: one query per unique paper, not per thread
+    const paperTitleMap = new Map<string, string>();
+    for (const pid of allPaperIds) {
+      const paper = await ctx.db
+        .query("papers")
+        .withIndex("by_sanitizedId", (q) => q.eq("sanitizedId", pid))
+        .first();
+      paperTitleMap.set(pid, paper?.title ?? pid);
+    }
+
+    // Build results using the map
     const results = [];
     for (const thread of threads) {
-      // Skip empty threads
       if (!thread.messageCount) continue;
-
-      // Resolve paper titles
-      const paperTitles: string[] = [];
-      for (const pid of thread.paperIds) {
-        const paper = await ctx.db
-          .query("papers")
-          .withIndex("by_sanitizedId", (q) => q.eq("sanitizedId", pid))
-          .first();
-        paperTitles.push(paper?.title ?? pid);
-      }
 
       results.push({
         _id: thread._id,
@@ -67,7 +74,7 @@ export const list = query({
         messageCount: thread.messageCount,
         preview: thread.preview,
         paperIds: thread.paperIds,
-        paperTitles,
+        paperTitles: thread.paperIds.map((pid) => paperTitleMap.get(pid) ?? pid),
       });
     }
 

@@ -167,7 +167,8 @@ export default defineSchema({
   })
     .index("by_paperId", ["paperId"])
     .index("by_paperId_indexVersion", ["paperId", "indexVersion"])
-    .index("by_paperId_chunkRefId", ["paperId", "chunkRefId"]),
+    .index("by_paperId_chunkRefId", ["paperId", "chunkRefId"])
+    .index("by_createdAt", ["createdAt"]),
 
   paper_source_files: defineTable({
     paperId: v.id("papers"),

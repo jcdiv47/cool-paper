@@ -48,14 +48,16 @@ export default function Home() {
   const [addOpen, setAddOpen] = useState(false);
   const prefersReduced = useReducedMotion();
 
-  // ---- Data queries (all fire in parallel) ----
+  // ---- Data queries (consolidated: 2 subscriptions instead of 7) ----
   const convexPapers = useQuery(api.papers.list);
-  const dashboardStats = useQuery(api.dashboard.stats);
-  const spotlightPapers = useQuery(api.dashboard.spotlightPapers);
-  const categoryData = useQuery(api.dashboard.categoryDistribution);
-  const timelineData = useQuery(api.dashboard.activityTimeline);
-  const activityFeed = useQuery(api.dashboard.recentActivity);
-  const heatmapData = useQuery(api.dashboard.enrichedHeatmap);
+  const dashboard = useQuery(api.dashboard.unified);
+
+  const dashboardStats = dashboard?.stats;
+  const spotlightPapers = dashboard?.spotlightPapers;
+  const categoryData = dashboard?.categoryDistribution;
+  const timelineData = dashboard?.activityTimeline;
+  const activityFeed = dashboard?.recentActivity;
+  const heatmapData = dashboard?.heatmap;
 
   const loading = convexPapers === undefined;
 

@@ -1,43 +1,9 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 
 // ---------------------------------------------------------------------------
-// Query 1: Dashboard stats — aggregate counts across all tables
-// ---------------------------------------------------------------------------
-export const stats = query({
-  args: {},
-  returns: v.object({
-    paperCount: v.number(),
-    threadCount: v.number(),
-    messageCount: v.number(),
-    annotationCount: v.number(),
-    citationCount: v.number(),
-    categoryCount: v.number(),
-  }),
-  handler: async (ctx) => {
-    const papers = await ctx.db.query("papers").collect();
-    const threads = await ctx.db.query("threads").collect();
-    const messageCount = threads.reduce(
-      (sum, t) => sum + (t.messageCount ?? 0),
-      0
-    );
-    const annotations = await ctx.db.query("annotations").collect();
-    const citations = await ctx.db.query("message_citations").collect();
-    const categories = new Set(papers.flatMap((p) => p.categories));
-
-    return {
-      paperCount: papers.length,
-      threadCount: threads.filter((t) => (t.messageCount ?? 0) > 0).length,
-      messageCount,
-      annotationCount: annotations.length,
-      citationCount: citations.length,
-      categoryCount: categories.size,
-    };
-  },
-});
-
-// ---------------------------------------------------------------------------
-// Query 2: Spotlight papers — top papers ranked by engagement score
+// Validators (kept identical to the shapes the frontend already expects)
 // ---------------------------------------------------------------------------
 const spotlightPaperValidator = v.object({
   sanitizedId: v.string(),
@@ -52,116 +18,179 @@ const spotlightPaperValidator = v.object({
   citationCount: v.number(),
 });
 
-export const spotlightPapers = query({
+const activityItemValidator = v.object({
+  type: v.union(
+    v.literal("paper_added"),
+    v.literal("thread_created"),
+    v.literal("annotation_created")
+  ),
+  timestamp: v.string(),
+  title: v.string(),
+  subtitle: v.optional(v.string()),
+  href: v.string(),
+});
+
+// ---------------------------------------------------------------------------
+// Unified dashboard query — reads each table exactly once
+// ---------------------------------------------------------------------------
+export const unified = query({
   args: {},
-  returns: v.array(spotlightPaperValidator),
-  handler: async (ctx) => {
-    const papers = await ctx.db.query("papers").collect();
-
-    const enriched = await Promise.all(
-      papers.map(async (paper) => {
-        // Threads referencing this paper
-        const threads = await ctx.db
-          .query("threads")
-          .withIndex("by_solePaperId", (q) =>
-            q.eq("solePaperId", paper.sanitizedId)
-          )
-          .collect();
-        const messageCount = threads.reduce(
-          (s, t) => s + (t.messageCount ?? 0),
-          0
-        );
-
-        // Annotations on this paper
-        const annotations = await ctx.db
-          .query("annotations")
-          .withIndex("by_paperId", (q) => q.eq("paperId", paper._id))
-          .collect();
-
-        // Citations referencing this paper
-        const citations = await ctx.db
-          .query("message_citations")
-          .withIndex("by_paperId_refId", (q) => q.eq("paperId", paper._id))
-          .collect();
-
-        const score =
-          threads.length * 3 +
-          messageCount +
-          annotations.length * 2 +
-          citations.length;
-
-        return {
-          sanitizedId: paper.sanitizedId,
-          title: paper.title,
-          authors: paper.authors,
-          summary: paper.summary,
-          categories: paper.categories,
-          published: paper.published,
-          threadCount: threads.length,
-          messageCount,
-          annotationCount: annotations.length,
-          citationCount: citations.length,
-          _score: score,
-        };
+  returns: v.object({
+    stats: v.object({
+      paperCount: v.number(),
+      threadCount: v.number(),
+      messageCount: v.number(),
+      annotationCount: v.number(),
+      citationCount: v.number(),
+      categoryCount: v.number(),
+    }),
+    spotlightPapers: v.array(spotlightPaperValidator),
+    categoryDistribution: v.array(
+      v.object({
+        category: v.string(),
+        count: v.number(),
       })
+    ),
+    activityTimeline: v.array(
+      v.object({
+        week: v.string(),
+        papersAdded: v.number(),
+        threadsCreated: v.number(),
+      })
+    ),
+    recentActivity: v.array(activityItemValidator),
+    heatmap: v.array(
+      v.object({
+        date: v.number(),
+        value: v.number(),
+      })
+    ),
+  }),
+  handler: async (ctx) => {
+    // =================================================================
+    // Single table scans (each table read exactly once)
+    // =================================================================
+    const papers = await ctx.db.query("papers").collect();
+    const threads = await ctx.db.query("threads").collect();
+    const annotations = await ctx.db.query("annotations").collect();
+    const citations = await ctx.db.query("message_citations").collect();
+
+    // =================================================================
+    // Lookup maps (avoid N+1 queries throughout)
+    // =================================================================
+    const paperById = new Map<string, Doc<"papers">>();
+    const paperBySanitizedId = new Map<string, Doc<"papers">>();
+    for (const p of papers) {
+      paperById.set(p._id as string, p);
+      paperBySanitizedId.set(p.sanitizedId, p);
+    }
+
+    // =================================================================
+    // 1. Stats
+    // =================================================================
+    const activeThreads = threads.filter((t) => (t.messageCount ?? 0) > 0);
+    const messageCount = threads.reduce(
+      (sum, t) => sum + (t.messageCount ?? 0),
+      0
     );
+    const categories = new Set(papers.flatMap((p) => p.categories));
+
+    const stats = {
+      paperCount: papers.length,
+      threadCount: activeThreads.length,
+      messageCount,
+      annotationCount: annotations.length,
+      citationCount: citations.length,
+      categoryCount: categories.size,
+    };
+
+    // =================================================================
+    // 2. Spotlight papers (replaces N+3 sub-queries with in-memory maps)
+    // =================================================================
+    // Group threads by solePaperId
+    const threadsByPaper = new Map<string, { count: number; messages: number }>();
+    for (const t of threads) {
+      if (!t.solePaperId) continue;
+      const entry = threadsByPaper.get(t.solePaperId) ?? {
+        count: 0,
+        messages: 0,
+      };
+      entry.count++;
+      entry.messages += t.messageCount ?? 0;
+      threadsByPaper.set(t.solePaperId, entry);
+    }
+
+    // Group annotations by paperId
+    const annotationCountByPaper = new Map<string, number>();
+    for (const a of annotations) {
+      const key = a.paperId as string;
+      annotationCountByPaper.set(key, (annotationCountByPaper.get(key) ?? 0) + 1);
+    }
+
+    // Group citations by paperId
+    const citationCountByPaper = new Map<string, number>();
+    for (const c of citations) {
+      const key = c.paperId as string;
+      citationCountByPaper.set(key, (citationCountByPaper.get(key) ?? 0) + 1);
+    }
+
+    const enriched = papers.map((paper) => {
+      const threadInfo = threadsByPaper.get(paper.sanitizedId) ?? {
+        count: 0,
+        messages: 0,
+      };
+      const annCount = annotationCountByPaper.get(paper._id as string) ?? 0;
+      const citCount = citationCountByPaper.get(paper._id as string) ?? 0;
+
+      const score =
+        threadInfo.count * 3 +
+        threadInfo.messages +
+        annCount * 2 +
+        citCount;
+
+      return {
+        sanitizedId: paper.sanitizedId,
+        title: paper.title,
+        authors: paper.authors,
+        summary: paper.summary,
+        categories: paper.categories,
+        published: paper.published,
+        threadCount: threadInfo.count,
+        messageCount: threadInfo.messages,
+        annotationCount: annCount,
+        citationCount: citCount,
+        _score: score,
+      };
+    });
 
     enriched.sort((a, b) => b._score - a._score);
 
-    return enriched
+    const spotlightPapers = enriched
       .filter((p) => p._score > 0)
       .slice(0, 6)
       .map(({ _score: _, ...rest }) => rest);
-  },
-});
 
-// ---------------------------------------------------------------------------
-// Query 3: Category distribution — paper counts per arXiv category
-// ---------------------------------------------------------------------------
-export const categoryDistribution = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      category: v.string(),
-      count: v.number(),
-    })
-  ),
-  handler: async (ctx) => {
-    const papers = await ctx.db.query("papers").collect();
-    const counts: Record<string, number> = {};
+    // =================================================================
+    // 3. Category distribution
+    // =================================================================
+    const catCounts: Record<string, number> = {};
     for (const p of papers) {
       for (const cat of p.categories) {
-        counts[cat] = (counts[cat] || 0) + 1;
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
       }
     }
-    return Object.entries(counts)
+    const categoryDistribution = Object.entries(catCounts)
       .map(([category, count]) => ({ category, count }))
       .sort((a, b) => b.count - a.count);
-  },
-});
 
-// ---------------------------------------------------------------------------
-// Query 4: Activity timeline — weekly paper/thread counts for last 6 months
-// ---------------------------------------------------------------------------
-export const activityTimeline = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      week: v.string(),
-      papersAdded: v.number(),
-      threadsCreated: v.number(),
-    })
-  ),
-  handler: async (ctx) => {
+    // =================================================================
+    // 4. Activity timeline (last 6 months, weekly buckets)
+    // =================================================================
     const now = new Date();
     const sixMonthsAgo = new Date(now);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     const cutoff = sixMonthsAgo.toISOString();
 
-    const papers = await ctx.db.query("papers").collect();
-    const threads = await ctx.db.query("threads").collect();
-
-    // Get Monday of a given date as ISO date string
     function getWeekStart(dateStr: string): string {
       const d = new Date(dateStr);
       const day = d.getDay();
@@ -170,7 +199,10 @@ export const activityTimeline = query({
       return monday.toISOString().slice(0, 10);
     }
 
-    const weekMap: Record<string, { papersAdded: number; threadsCreated: number }> = {};
+    const weekMap: Record<
+      string,
+      { papersAdded: number; threadsCreated: number }
+    > = {};
 
     // Generate all weeks in range so chart has no gaps
     const cursor = new Date(getWeekStart(cutoff));
@@ -188,52 +220,20 @@ export const activityTimeline = query({
       }
     }
 
-    for (const t of threads) {
-      if (t.createdAt >= cutoff && (t.messageCount ?? 0) > 0) {
+    for (const t of activeThreads) {
+      if (t.createdAt >= cutoff) {
         const week = getWeekStart(t.createdAt);
         if (weekMap[week]) weekMap[week].threadsCreated++;
       }
     }
 
-    return Object.entries(weekMap)
+    const activityTimeline = Object.entries(weekMap)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([week, data]) => ({ week, ...data }));
-  },
-});
 
-// ---------------------------------------------------------------------------
-// Query 5: Recent activity — unified feed of latest events
-// ---------------------------------------------------------------------------
-const activityItemValidator = v.object({
-  type: v.union(
-    v.literal("paper_added"),
-    v.literal("thread_created"),
-    v.literal("annotation_created")
-  ),
-  timestamp: v.string(),
-  title: v.string(),
-  subtitle: v.optional(v.string()),
-  href: v.string(),
-});
-
-export const recentActivity = query({
-  args: {},
-  returns: v.array(activityItemValidator),
-  handler: async (ctx) => {
-    const papers = await ctx.db
-      .query("papers")
-      .withIndex("by_addedAt")
-      .order("desc")
-      .take(20);
-
-    const threads = await ctx.db
-      .query("threads")
-      .withIndex("by_updatedAt")
-      .order("desc")
-      .take(20);
-
-    const annotations = await ctx.db.query("annotations").collect();
-
+    // =================================================================
+    // 5. Recent activity (replaces N+1 paper lookups with in-memory map)
+    // =================================================================
     type ActivityItem = {
       type: "paper_added" | "thread_created" | "annotation_created";
       timestamp: string;
@@ -244,8 +244,12 @@ export const recentActivity = query({
 
     const events: ActivityItem[] = [];
 
-    // Paper additions
-    for (const p of papers) {
+    // Recent papers (take 20 most recent by addedAt)
+    const recentPapers = [...papers]
+      .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+      .slice(0, 20);
+
+    for (const p of recentPapers) {
       events.push({
         type: "paper_added",
         timestamp: p.addedAt,
@@ -255,37 +259,33 @@ export const recentActivity = query({
       });
     }
 
-    // Thread creation (only non-empty threads)
-    for (const t of threads) {
-      if ((t.messageCount ?? 0) === 0) continue;
+    // Recent threads (take 20 most recent by updatedAt)
+    const recentThreads = [...activeThreads]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 20);
 
-      // Resolve first paper title
-      let paperTitle: string | undefined;
+    for (const t of recentThreads) {
       const firstPaperId = t.paperIds[0];
-      if (firstPaperId) {
-        const paper = await ctx.db
-          .query("papers")
-          .withIndex("by_sanitizedId", (q) => q.eq("sanitizedId", firstPaperId))
-          .first();
-        paperTitle = paper?.title;
-      }
+      const paper = firstPaperId
+        ? paperBySanitizedId.get(firstPaperId)
+        : undefined;
 
       events.push({
         type: "thread_created",
         timestamp: t.createdAt,
         title: t.title,
-        subtitle: paperTitle,
+        subtitle: paper?.title,
         href: `/chat/${t._id}`,
       });
     }
 
-    // Annotations — sort by createdAt desc, take most recent
-    const sortedAnnotations = annotations
+    // Recent annotations (take 20 most recent by createdAt)
+    const recentAnnotations = [...annotations]
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 20);
 
-    for (const a of sortedAnnotations) {
-      const paper = await ctx.db.get(a.paperId);
+    for (const a of recentAnnotations) {
+      const paper = paperById.get(a.paperId as string);
       if (!paper) continue;
 
       const label =
@@ -297,56 +297,49 @@ export const recentActivity = query({
         type: "annotation_created",
         timestamp: a.createdAt,
         title: label,
-        subtitle: a.exact.length > 80 ? a.exact.slice(0, 80) + "..." : a.exact,
+        subtitle:
+          a.exact.length > 80 ? a.exact.slice(0, 80) + "..." : a.exact,
         href: `/paper/${paper.sanitizedId}`,
       });
     }
 
-    // Sort all events by timestamp desc and return top 8
     events.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-    return events.slice(0, 8);
-  },
-});
+    const recentActivity = events.slice(0, 8);
 
-// ---------------------------------------------------------------------------
-// Query 6: Enriched heatmap — combines papers + threads + annotations by date
-// ---------------------------------------------------------------------------
-export const enrichedHeatmap = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      date: v.number(),
-      value: v.number(),
-    })
-  ),
-  handler: async (ctx) => {
-    const papers = await ctx.db.query("papers").collect();
-    const threads = await ctx.db.query("threads").collect();
-    const annotations = await ctx.db.query("annotations").collect();
-
-    const counts: Record<string, number> = {};
+    // =================================================================
+    // 6. Enriched heatmap
+    // =================================================================
+    const heatCounts: Record<string, number> = {};
 
     function addDate(isoString: string) {
       const d = new Date(isoString);
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      counts[key] = (counts[key] || 0) + 1;
+      heatCounts[key] = (heatCounts[key] || 0) + 1;
     }
 
     for (const p of papers) {
       if (p.addedAt) addDate(p.addedAt);
     }
-
-    for (const t of threads) {
-      if (t.createdAt && (t.messageCount ?? 0) > 0) addDate(t.createdAt);
+    for (const t of activeThreads) {
+      if (t.createdAt) addDate(t.createdAt);
     }
-
     for (const a of annotations) {
       if (a.createdAt) addDate(a.createdAt);
     }
 
-    return Object.entries(counts).map(([dateStr, value]) => ({
+    const heatmap = Object.entries(heatCounts).map(([dateStr, value]) => ({
       date: Math.floor(new Date(dateStr).getTime() / 1000),
       value,
     }));
+
+    // =================================================================
+    return {
+      stats,
+      spotlightPapers,
+      categoryDistribution,
+      activityTimeline,
+      recentActivity,
+      heatmap,
+    };
   },
 });
