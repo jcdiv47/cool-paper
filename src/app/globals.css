@@ -237,15 +237,15 @@
 /* ─── PDF viewer ─── */
 .pdf-page-shadow {
   background: oklch(0.145 0.008 260);
-  border-radius: 8px;
+  border-radius: 0px;
 }
 .pdf-page-placeholder {
   background: oklch(0.145 0.008 260);
-  border-radius: 8px;
+  border-radius: 0px;
 }
 .pdf-dark-pages .react-pdf__Page__canvas {
   filter: invert(0.88) hue-rotate(180deg);
-  border-radius: 4px;
+  border-radius: 0px;
 }
 .pdf-match {
   background: rgba(0, 200, 180, 0.3);
