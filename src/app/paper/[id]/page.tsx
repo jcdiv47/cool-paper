@@ -76,6 +76,8 @@ export default function PaperPage({
   const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
   // Mobile panel state — used for the bottom sheet approach on mobile
   const [mobilePanel, setMobilePanel] = useState<"chat" | null>(null);
+  // Tracks the refId to scroll-to in chat (set by "Back to chat" button in PDF viewer)
+  const [scrollToRefId, setScrollToRefId] = useState<string | undefined>(undefined);
 
   const convexPaper = useQuery(api.papers.get, { sanitizedId: id });
   const loading = convexPaper === undefined;
@@ -176,6 +178,19 @@ export default function PaperPage({
     [updateUrl],
   );
 
+  const handleReturnToChat = useCallback(
+    (refId: string) => {
+      // Clear citation focus from PDF, ensure chat is open, and scroll chat to the message
+      updateUrl({ cite: null, page: null, chat: "1" });
+      // Use a unique key each time so the effect re-fires even for the same refId
+      setScrollToRefId(`${refId}::${Date.now()}`);
+    },
+    [updateUrl],
+  );
+
+  // Extract the actual refId from the scroll-to key (strip the timestamp suffix)
+  const scrollToRefIdClean = scrollToRefId?.split("::")[0];
+
   // --- Keyboard shortcuts ---
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -272,6 +287,7 @@ export default function PaperPage({
             onToggleChat={isDesktop ? handleToggleChat : undefined}
             onViewSummary={() => updateUrl({ view: null })}
             chatOpen={chatOpen}
+            onReturnToChat={handleReturnToChat}
           />
         ) : (
           <SummaryView
@@ -293,6 +309,7 @@ export default function PaperPage({
           }}
           onCitationNavigate={handleCitationNavigate}
           mode="sheet"
+          scrollToRefId={scrollToRefIdClean}
         />
       )}
 
@@ -332,6 +349,7 @@ export default function PaperPage({
                     onCitationNavigate={handleCitationNavigate}
                     mode="inline"
                     className="min-h-0 flex-1"
+                    scrollToRefId={scrollToRefIdClean}
                   />
                 )}
               </div>

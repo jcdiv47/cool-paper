@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
+import { useSearchParams } from "next/navigation";
 import { api } from "../../convex/_generated/api";
 import { useConvexChat } from "@/hooks/use-convex-chat";
 import { ChatView } from "@/components/chat-view";
@@ -22,6 +23,8 @@ interface PaperChatDrawerProps {
   onCitationNavigate: (href: string) => void;
   mode?: "sheet" | "inline";
   className?: string;
+  /** When set, scroll chat to the message containing this refId. */
+  scrollToRefId?: string;
 }
 
 export function PaperChatDrawer({
@@ -32,10 +35,13 @@ export function PaperChatDrawer({
   onCitationNavigate,
   mode = "sheet",
   className,
+  scrollToRefId,
 }: PaperChatDrawerProps) {
   const chat = useConvexChat();
   const existingThread = useQuery(api.threads.getByPaperId, { paperId });
   const initializedRef = useRef(false);
+  const searchParams = useSearchParams();
+  const activeCiteRefId = searchParams.get("cite") ?? undefined;
 
   // On mount / when existingThread resolves, load or prepare the thread
   useEffect(() => {
@@ -69,6 +75,8 @@ export function PaperChatDrawer({
       papers={papers}
       onNavigate={onCitationNavigate}
       hidePaperCards
+      activeCiteRefId={activeCiteRefId}
+      scrollToRefId={scrollToRefId}
     />
   );
 

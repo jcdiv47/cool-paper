@@ -204,6 +204,23 @@
   color: var(--muted-foreground);
 }
 
+/* ─── Active citation (currently viewed in PDF) ─── */
+.citation-chip-active {
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
+  border-color: color-mix(in oklch, var(--primary) 60%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 20%, transparent);
+}
+
+/* ─── Chat message flash (scroll-to highlight) ─── */
+@keyframes message-flash {
+  0% { background: color-mix(in oklch, var(--primary) 15%, transparent); }
+  100% { background: transparent; }
+}
+.chat-message-flash {
+  animation: message-flash 1.5s ease-out;
+  border-radius: 0.75rem;
+}
+
 /* ─── PDF text-layer: keep selection readable without font mismatch ─── */
 .react-pdf__Page__textContent.textLayer span {
   color: transparent !important;

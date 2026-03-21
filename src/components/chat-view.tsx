@@ -45,6 +45,10 @@ interface ChatViewProps {
   onAddPaperClick?: () => void;
   onNavigate?: (href: string) => void;
   hidePaperCards?: boolean;
+  /** The refId of the citation currently being viewed in the PDF. */
+  activeCiteRefId?: string;
+  /** When set, scroll the chat to the message containing this refId and flash it. */
+  scrollToRefId?: string;
 }
 
 const SINGLE_SUGGESTIONS = [
@@ -175,12 +179,14 @@ function AssistantMessage({
   citationTargets,
   annotationTargets,
   onNavigate,
+  activeCiteRefId,
 }: {
   message: ThreadMessage;
   isMultiPaper: boolean;
   citationTargets: Record<string, CitationTarget>;
   annotationTargets: Record<string, AnnotationTarget>;
   onNavigate?: (href: string) => void;
+  activeCiteRefId?: string;
 }) {
   return (
     <div className="w-full">
@@ -203,6 +209,7 @@ function AssistantMessage({
             annotationTargets={annotationTargets}
             showPaperLabel={isMultiPaper}
             onNavigate={onNavigate}
+            activeCiteRefId={activeCiteRefId}
           />
         </article>
       ) : null}
@@ -218,6 +225,7 @@ function StreamingAssistantMessage({
   citationTargets,
   annotationTargets,
   onNavigate,
+  activeCiteRefId,
 }: {
   message: ThreadMessage;
   isThinking: boolean;
@@ -226,6 +234,7 @@ function StreamingAssistantMessage({
   citationTargets: Record<string, CitationTarget>;
   annotationTargets: Record<string, AnnotationTarget>;
   onNavigate?: (href: string) => void;
+  activeCiteRefId?: string;
 }) {
   return (
     <div className="w-full">
@@ -246,6 +255,7 @@ function StreamingAssistantMessage({
             annotationTargets={annotationTargets}
             showPaperLabel={isMultiPaper}
             onNavigate={onNavigate}
+            activeCiteRefId={activeCiteRefId}
             sanitizePartial
           />
         </article>
@@ -271,6 +281,8 @@ export function ChatView({
   onAddPaperClick,
   onNavigate,
   hidePaperCards,
+  activeCiteRefId,
+  scrollToRefId,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -280,6 +292,7 @@ export function ChatView({
   const lastScrollTop = useRef(0);
   const lastUserMsgRef = useRef<HTMLDivElement>(null);
   const justSubmittedRef = useRef(false);
+  const lastScrollToRefIdRef = useRef<string | null>(null);
 
   // Auto-scroll during streaming, but pause if user scrolls up
   useEffect(() => {
@@ -339,6 +352,26 @@ export function ChatView({
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }, []);
+
+  // Scroll to a specific citation refId (triggered by "Back to chat" from PDF viewer)
+  useEffect(() => {
+    if (!scrollToRefId || scrollToRefId === lastScrollToRefIdRef.current) return;
+    lastScrollToRefIdRef.current = scrollToRefId;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    // Find the message element containing a data-ref-ids attribute that includes this refId
+    const el = container.querySelector<HTMLElement>(
+      `[data-ref-ids*="${CSS.escape(scrollToRefId)}"]`
+    );
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("chat-message-flash");
+    const timer = setTimeout(() => el.classList.remove("chat-message-flash"), 1600);
+    return () => clearTimeout(timer);
+  }, [scrollToRefId]);
 
   function handleSubmit() {
     if (!input.trim() || isStreaming) return;
@@ -420,6 +453,7 @@ export function ChatView({
             page: chunk.page,
             sanitizedId: chunk.sanitizedId,
             section: chunk.section,
+            text: chunk.text,
           },
         ])
       ),
@@ -453,31 +487,44 @@ export function ChatView({
     messages.length > 0 || Boolean(streamingMessage) || isStreaming;
   const renderedMessages = useMemo(
     () =>
-      messages.map((msg, i) => (
-        <div
-          key={`${msg.timestamp}-${msg.role}-${i}`}
-          ref={i === lastUserMessageIndex && msg.role === "user" ? lastUserMsgRef : undefined}
-        >
-          {msg.role === "user" ? (
-            <div className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 ring-1 ring-primary/15">
-                <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                  {msg.content}
-                </p>
+      messages.map((msg, i) => {
+        // Collect citation refIds for this message for data-ref-ids attribute
+        const msgRefIds =
+          msg.role === "assistant"
+            ? parseCitationTokens(msg.content)
+                .map((c) => c.refId)
+                .join(",")
+            : undefined;
+
+        return (
+          <div
+            key={`${msg.timestamp}-${msg.role}-${i}`}
+            ref={i === lastUserMessageIndex && msg.role === "user" ? lastUserMsgRef : undefined}
+            data-ref-ids={msgRefIds || undefined}
+          >
+            {msg.role === "user" ? (
+              <div className="flex justify-end">
+                <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 ring-1 ring-primary/15">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {msg.content}
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <AssistantMessage
-              message={msg}
-              isMultiPaper={Boolean(isMultiPaper)}
-              citationTargets={citationTargets}
-              annotationTargets={annotationTargets}
-              onNavigate={onNavigate}
-            />
-          )}
-        </div>
-      )),
+            ) : (
+              <AssistantMessage
+                message={msg}
+                isMultiPaper={Boolean(isMultiPaper)}
+                citationTargets={citationTargets}
+                annotationTargets={annotationTargets}
+                onNavigate={onNavigate}
+                activeCiteRefId={activeCiteRefId}
+              />
+            )}
+          </div>
+        );
+      }),
     [
+      activeCiteRefId,
       annotationTargets,
       citationTargets,
       isMultiPaper,
@@ -544,6 +591,7 @@ export function ChatView({
                   citationTargets={citationTargets}
                   annotationTargets={annotationTargets}
                   onNavigate={onNavigate}
+                  activeCiteRefId={activeCiteRefId}
                 />
               ) : isStreaming ? (
                 <div className="w-full">

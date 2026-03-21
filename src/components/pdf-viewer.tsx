@@ -75,6 +75,8 @@ interface PdfViewerProps {
   onToggleChat?: () => void;
   onViewSummary?: () => void;
   chatOpen?: boolean;
+  /** Called when user clicks "Back to chat" after navigating to a citation. */
+  onReturnToChat?: (refId: string) => void;
 }
 
 interface PendingSelection {
@@ -160,6 +162,7 @@ export function PdfViewer({
   onToggleChat,
   onViewSummary,
   chatOpen,
+  onReturnToChat,
 }: PdfViewerProps) {
   const searchParams = useSearchParams();
   const citeRefId = searchParams.get("cite");
@@ -1456,6 +1459,18 @@ export function PdfViewer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* "Back to chat" floating pill — shown when viewing a citation from chat */}
+      {citeRefId && onReturnToChat && (
+        <button
+          type="button"
+          className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/90 px-4 py-2 text-sm font-medium shadow-lg backdrop-blur-xl transition-all hover:bg-primary/10 hover:border-primary/40 hover:shadow-primary/10"
+          onClick={() => onReturnToChat(citeRefId)}
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+          Back to chat
+        </button>
+      )}
     </div>
   );
 }
