@@ -56,31 +56,37 @@ export function PaperCard({
         className="animate-card-enter block"
         style={{ animationDelay: `${index * 60}ms` }}
       >
-        <Card className={`group h-full border-border bg-card transition-colors duration-200 hover:border-primary/30 ${
+        <Card className={`group h-full border-border/40 bg-card/80 backdrop-blur-sm transition-all duration-300 hover:border-primary/25 hover:bg-card hover:shadow-lg hover:shadow-primary/5 ${
           paper.importState.phase === "importing" ? "border-l-2 border-l-muted-foreground/20" :
           paper.importState.phase === "failed" ? "border-l-2 border-l-destructive/40" : ""
         }`}>
-          <div className="space-y-2.5 px-5 py-4">
+          <div className="space-y-3 px-5 py-5">
             {/* Meta row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50">
-                {paper.importState.phase === "importing" ? (
-                  <span className="inline-flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                    {stageLabel(paper.importState.stage)}
-                  </span>
-                ) : paper.importState.phase === "failed" ? (
-                  <span className="inline-flex items-center gap-1 rounded bg-destructive/10 px-1.5 py-0.5 font-mono text-[10px] text-destructive">
-                    <AlertTriangle className="h-2.5 w-2.5" />
-                    IMPORT FAILED
-                  </span>
-                ) : (
-                  <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-primary">
-                    {paper.categories[0]}
-                  </span>
-                )}
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground/50">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-primary">
+                  {paper.categories[0]}
+                </span>
                 <span className="text-border">·</span>
                 <time>{dateStr}</time>
+                {paper.importState.phase === "importing" && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      {stageLabel(paper.importState.stage)}
+                    </span>
+                  </>
+                )}
+                {paper.importState.phase === "failed" && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 font-mono text-[10px] text-destructive">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      IMPORT FAILED
+                    </span>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-70">
                 {paper.importState.phase === "failed" && onRetry && (
@@ -113,7 +119,7 @@ export function PaperCard({
             </div>
 
             {/* Title */}
-            <h3 className="font-serif text-base font-semibold leading-snug tracking-tight line-clamp-2 group-hover:text-primary transition-colors duration-200">
+            <h3 className="font-serif text-base font-semibold leading-snug tracking-tight line-clamp-2 group-hover:text-primary transition-colors duration-300">
               {paper.title}
             </h3>
 
@@ -123,7 +129,7 @@ export function PaperCard({
             </p>
 
             {/* Abstract */}
-            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/50">
+            <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground/45">
               {abstractExcerpt}
             </p>
 
@@ -132,7 +138,7 @@ export function PaperCard({
               {paper.categories.slice(0, 3).map((cat) => (
                 <span
                   key={cat}
-                  className="rounded-md border border-border/60 bg-transparent px-1.5 py-px font-mono text-[10px] text-muted-foreground"
+                  className="rounded-full border border-border/50 bg-muted/20 px-2 py-px font-mono text-[10px] text-muted-foreground"
                 >
                   {cat}
                 </span>

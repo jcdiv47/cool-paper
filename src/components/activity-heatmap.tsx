@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import "cal-heatmap/cal-heatmap.css";
 import type { PaperMetadata } from "@/types";
 
@@ -59,43 +59,84 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
   const legendRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<{ paint: (...args: unknown[]) => void; destroy: () => void } | null>(null);
 
+  // Track the current range so we only re-render when the breakpoint changes
+  const rangeRef = useRef<number>(0);
+
+  // Derive a stable key from addedAt dates only — the sole field the heatmap
+  // uses.  During import the importStatus changes but addedAt stays the same,
+  // so the memoised data keeps its reference and the effect won't re-run.
+  const addedAtKey = useMemo(
+    () =>
+      papers
+        .map((p) => p.addedAt ?? "")
+        .sort()
+        .join(","),
+    [papers]
+  );
+
+  const heatmapData = useMemo(() => {
+    const data = buildHeatmapData(papers);
+    if (data.length > 0) writeCache(data);
+    return data;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by addedAt values
+  }, [addedAtKey]);
+
   useEffect(() => {
     let destroyed = false;
 
-    // Use cached data for instant render, or build from papers
+    // Use cached data for instant render, or built from papers
     const cached = readCache();
-    const heatmapData = buildHeatmapData(papers);
-
-    if (heatmapData.length > 0) {
-      writeCache(heatmapData);
-    }
 
     const dataToUse = heatmapData.length > 0 ? heatmapData : cached?.data ?? null;
     if (!dataToUse) return;
 
-    async function init() {
-      const [
-        { default: CalHeatmap },
-        { default: Tooltip },
-        { default: LegendLite },
-        { default: CalendarLabel },
-      ] = await Promise.all([
-        import("cal-heatmap"),
-        import("cal-heatmap/plugins/Tooltip"),
-        import("cal-heatmap/plugins/LegendLite"),
-        import("cal-heatmap/plugins/CalendarLabel"),
-      ]);
+    // Modules loaded once, reused on resize
+    let modules: {
+      CalHeatmap: typeof import("cal-heatmap")["default"];
+      Tooltip: unknown;
+      LegendLite: unknown;
+      CalendarLabel: unknown;
+    } | null = null;
+
+    function getRange() {
+      // lg breakpoint = 1024px (Tailwind default)
+      return window.innerWidth >= 1024 ? 10 : 5;
+    }
+
+    async function paint() {
+      if (!modules) {
+        const [ch, tt, ll, cl] = await Promise.all([
+          import("cal-heatmap"),
+          import("cal-heatmap/plugins/Tooltip"),
+          import("cal-heatmap/plugins/LegendLite"),
+          import("cal-heatmap/plugins/CalendarLabel"),
+        ]);
+        modules = {
+          CalHeatmap: ch.default,
+          Tooltip: tt.default,
+          LegendLite: ll.default,
+          CalendarLabel: cl.default,
+        };
+      }
 
       if (destroyed || !containerRef.current || !legendRef.current) return;
 
-      // Destroy previous instance if re-rendering
+      const range = getRange();
+
+      // Skip if breakpoint hasn't changed
+      if (rangeRef.current === range && calRef.current) return;
+      rangeRef.current = range;
+
+      // Destroy previous instance
       calRef.current?.destroy();
+
+      const { CalHeatmap, Tooltip, LegendLite, CalendarLabel } = modules;
 
       const cal = new CalHeatmap();
       calRef.current = cal;
 
       const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 11);
+      startDate.setMonth(startDate.getMonth() - (range - 1));
       startDate.setDate(1);
 
       cal.paint(
@@ -107,11 +148,11 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
             groupY: "sum",
           },
           date: { start: startDate },
-          range: 12,
+          range,
           scale: {
             color: {
               type: "threshold",
-              range: ["#1a1e3a", "#2e3366", "#4a4f99", "#6b72cc"],
+              range: ["#132a2a", "#1a4040", "#257070", "#35b0a0"],
               domain: [1, 2, 3],
             },
           },
@@ -126,7 +167,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
           },
           subDomain: {
             type: "ghDay",
-            radius: 2,
+            radius: 3,
             width: 11,
             height: 11,
             gutter: 4,
@@ -155,7 +196,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
             {
               includeBlank: true,
               itemSelector: legendRef.current,
-              radius: 2,
+              radius: 3,
               width: 11,
               height: 11,
               gutter: 4,
@@ -174,18 +215,31 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       );
     }
 
-    init();
+    paint();
+
+    // Re-paint when crossing the breakpoint on resize
+    function onResize() {
+      const newRange = getRange();
+      if (newRange !== rangeRef.current) {
+        paint();
+      }
+    }
+
+    window.addEventListener("resize", onResize);
 
     return () => {
       destroyed = true;
+      window.removeEventListener("resize", onResize);
       calRef.current?.destroy();
+      calRef.current = null;
+      rangeRef.current = 0;
     };
-  }, [papers]);
+  }, [heatmapData]);
 
   return (
     <div
       data-theme="dark"
-      className="min-w-0 flex-1 overflow-x-auto border border-border bg-card p-4 text-foreground"
+      className="min-w-0 overflow-x-auto rounded-xl border border-border/40 bg-card/60 p-5 text-foreground backdrop-blur-sm"
     >
       <div ref={containerRef} />
       <div className="mt-2 flex items-center justify-end gap-1 text-xs text-muted-foreground">
