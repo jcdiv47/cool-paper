@@ -25,3 +25,14 @@ export function useRetryImport() {
     [retry]
   );
 }
+
+export function useRegenerateSummary() {
+  const regenerate = useAction(api.actions.importPaper.regenerateSummary);
+
+  return useCallback(
+    async (sanitizedId: string) => {
+      await regenerate({ sanitizedId });
+    },
+    [regenerate]
+  );
+}

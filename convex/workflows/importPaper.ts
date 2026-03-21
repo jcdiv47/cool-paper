@@ -53,3 +53,36 @@ export const runImportPaper = workflow.define({
     }
   },
 });
+
+export const runRegenerateSummary = workflow.define({
+  args: {
+    paperId: v.id("papers"),
+  },
+  handler: async (step, args): Promise<void> => {
+    try {
+      await step.runAction(
+        internal.actions.importPaper.generatePaperSummary,
+        { paperId: args.paperId },
+        {
+          retry: IMPORT_ACTION_RETRY,
+          name: "generatePaperSummary",
+        },
+      );
+      await step.runMutation(
+        internal.importPaper.markImportCompleted,
+        { paperId: args.paperId },
+        { name: "markImportCompleted" },
+      );
+    } catch (error) {
+      await step.runMutation(
+        internal.importPaper.markImportFailed,
+        {
+          paperId: args.paperId,
+          error: formatWorkflowError(error),
+        },
+        { name: "markImportFailed" },
+      );
+      throw error;
+    }
+  },
+});

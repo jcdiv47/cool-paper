@@ -576,6 +576,35 @@ export const retryImport = action({
   },
 });
 
+export const regenerateSummary = action({
+  args: {
+    sanitizedId: v.string(),
+  },
+  returns: queuedStatusValidator,
+  handler: async (ctx, { sanitizedId }): Promise<{ status: string }> => {
+    const paper = await ctx.runQuery(api.papers.get, { sanitizedId });
+    if (!paper) {
+      throw new Error("Paper not found");
+    }
+    if (paper.importStatus !== "completed") {
+      throw new Error("Paper import is not completed");
+    }
+
+    await ctx.runMutation(internal.papers.updateImportStatus, {
+      id: paper._id,
+      importStatus: "generating_summary",
+    });
+
+    await workflow.start(
+      ctx,
+      internal.workflows.importPaper.runRegenerateSummary,
+      { paperId: paper._id },
+    );
+
+    return { status: "queued" };
+  },
+});
+
 export const importPaper = action({
   args: {
     arxivId: v.string(),

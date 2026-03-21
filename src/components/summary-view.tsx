@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
-import { FileText, MessageCircle } from "lucide-react";
+import { FileText, MessageCircle, RefreshCw } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { CitationMarkdown, type CitationTarget } from "@/components/citation-markdown";
 import { parseCitationTokens } from "@/lib/citations";
+import { useRegenerateSummary } from "@/hooks/use-paper-actions";
 import type { PaperMetadata } from "@/types";
 
 interface SummaryViewProps {
@@ -24,6 +25,22 @@ export function SummaryView({
   onNavigate,
 }: SummaryViewProps) {
   const router = useRouter();
+  const regenerateSummary = useRegenerateSummary();
+  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  const sanitizedId = paper.arxivId.replace(/\//g, "_");
+
+  const handleRegenerate = useCallback(async () => {
+    setIsRegenerating(true);
+    try {
+      await regenerateSummary(sanitizedId);
+    } catch {
+      // error handling is passive — the UI will reflect the import state
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [regenerateSummary, sanitizedId]);
+
   const summary = useMemo(() => {
     const raw = paper.summary?.trim();
     if (!raw) return raw;
@@ -33,7 +50,6 @@ export function SummaryView({
     if (guideStart > 0) return raw.slice(guideStart).trim();
     return raw;
   }, [paper.summary]);
-  const sanitizedId = paper.arxivId.replace(/\//g, "_");
   const citationRefIds = useMemo(
     () => (summary ? [...new Set(parseCitationTokens(summary).map((token) => token.refId))] : []),
     [summary],
@@ -148,19 +164,35 @@ export function SummaryView({
 
           {/* Summary */}
           {summary ? (
-            <article
-              className={
-                compact
-                  ? "prose prose-sm prose-summary max-w-none prose-invert"
-                  : "prose prose-lg prose-summary max-w-none prose-invert"
-              }
-            >
-              <CitationMarkdown
-                content={summary}
-                targets={citationTargets}
-                onNavigate={onNavigate}
-              />
-            </article>
+            <>
+              <article
+                className={
+                  compact
+                    ? "prose prose-sm prose-summary max-w-none prose-invert"
+                    : "prose prose-lg prose-summary max-w-none prose-invert"
+                }
+              >
+                <CitationMarkdown
+                  content={summary}
+                  targets={citationTargets}
+                  onNavigate={onNavigate}
+                />
+              </article>
+              {paper.importState.phase === "completed" && (
+                <div className={compact ? "mt-6" : "mt-8"}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 rounded-lg px-3 text-xs text-muted-foreground"
+                    disabled={isRegenerating}
+                    onClick={handleRegenerate}
+                  >
+                    <RefreshCw className={`h-3 w-3 ${isRegenerating ? "animate-spin" : ""}`} />
+                    {isRegenerating ? "Regenerating..." : "Regenerate Reading Guide"}
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <p className="mt-4 text-sm text-muted-foreground">
               Guided summary is being generated.
