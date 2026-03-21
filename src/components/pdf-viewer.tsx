@@ -583,14 +583,15 @@ export function PdfViewer({
     setZoom(Math.max(ZOOM_MIN, next));
   }, [displayZoom]);
 
-  // Search text renderer
   const textRenderer = useCallback(
     (item: { str: string }) => {
-      if (!query || query.length < 2) return item.str;
+      const trimmedQuery = query.trim();
+      if (trimmedQuery.length < 2) return item.str;
+
       try {
         return item.str.replace(
-          new RegExp(`(${escapeRegExp(query)})`, "gi"),
-          '<mark class="pdf-match">$1</mark>',
+          new RegExp(`(${escapeRegExp(trimmedQuery)})`, "gi"),
+          '<span class="pdf-search-match">$1</span>',
         );
       } catch {
         return item.str;
@@ -1430,7 +1431,7 @@ export function PdfViewer({
             <div
               key={row[0]}
               className={cn(
-                "flex justify-center py-3 first:pt-4 last:pb-8",
+                "flex justify-center py-1 first:pt-2 last:pb-8",
                 twoCol && "gap-4",
               )}
             >
@@ -1450,7 +1451,7 @@ export function PdfViewer({
                         width={pageWidth}
                         onLoadSuccess={n === 1 ? onFirstPage : undefined}
                         customTextRenderer={
-                          query.length >= 2 ? textRenderer : undefined
+                          query.trim().length >= 2 ? textRenderer : undefined
                         }
                         loading={
                           <div

@@ -247,10 +247,13 @@
   filter: invert(0.88) hue-rotate(180deg);
   border-radius: 0px;
 }
-.pdf-match {
+.pdf-search-match {
+  display: inline;
   background: rgba(0, 200, 180, 0.3);
-  padding: 0 1px;
+  padding: 0;
   border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 .pdf-citation-focus {
   background: rgba(0, 200, 180, 0.38) !important;
