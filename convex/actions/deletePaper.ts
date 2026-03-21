@@ -8,9 +8,10 @@ export const deletePaper = action({
   args: {
     paperId: v.id("papers"),
   },
+  returns: v.null(),
   handler: async (ctx, { paperId }) => {
     const paper = await ctx.runQuery(api.papers.getById, { id: paperId });
-    if (!paper) return;
+    if (!paper) return null;
 
     // Delete source files
     await ctx.runMutation(api.paperSourceFiles.replaceForPaper, {
@@ -25,5 +26,6 @@ export const deletePaper = action({
 
     // Delete paper and cascade (notes, annotations, chunks, citations, jobs)
     await ctx.runMutation(api.papers.remove, { id: paperId });
+    return null;
   },
 });

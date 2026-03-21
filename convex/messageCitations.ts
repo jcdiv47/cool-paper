@@ -8,8 +8,20 @@ const citationEntry = v.object({
   occurrence: v.number(),
 });
 
+const messageCitationDocValidator = v.object({
+  _id: v.id("message_citations"),
+  _creationTime: v.number(),
+  messageId: v.id("messages"),
+  paperId: v.id("papers"),
+  indexVersion: v.number(),
+  refId: v.string(),
+  occurrence: v.number(),
+  createdAt: v.string(),
+});
+
 export const listByMessage = query({
   args: { messageId: v.id("messages") },
+  returns: v.array(messageCitationDocValidator),
   handler: async (ctx, { messageId }) => {
     const citations = await ctx.db
       .query("message_citations")
@@ -28,6 +40,7 @@ export const replaceForMessage = mutation({
     messageId: v.id("messages"),
     entries: v.array(citationEntry),
   },
+  returns: v.number(),
   handler: async (ctx, { messageId, entries }) => {
     const existing = await ctx.db
       .query("message_citations")

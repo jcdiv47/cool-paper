@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useState } from "react";
 import type { ChatThreadListItem } from "@/types";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export default function ChatInboxPage() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function ChatInboxPage() {
 
   async function handleDelete(threadId: string) {
     try {
-      await removeThread({ id: threadId as any });
+      await removeThread({ id: threadId as Id<"threads"> });
       toast.success("Chat deleted");
     } catch {
       toast.error("Failed to delete chat");

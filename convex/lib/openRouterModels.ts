@@ -164,6 +164,18 @@ export function getConfiguredModelsWithEffectiveIds() {
   }));
 }
 
+/**
+ * Like getConfiguredModelsWithEffectiveIds but does NOT read process.env.
+ * Safe to call from V8 (query/mutation) runtime where process.env is
+ * unavailable.  Returns each model's default modelId as effectiveModelId.
+ */
+export function getConfiguredModelsStatic() {
+  return MODEL_OPTIONS.map((option) => ({
+    ...option,
+    effectiveModelId: option.modelId,
+  }));
+}
+
 function normalizeOptionalNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {

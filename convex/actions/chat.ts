@@ -31,6 +31,30 @@ import {
 import { parseThinkTags } from "../lib/modelConfig";
 import type { Doc, Id } from "../_generated/dataModel";
 
+const citationEntryValidator = v.object({
+  paperId: v.id("papers"),
+  indexVersion: v.number(),
+  refId: v.string(),
+  occurrence: v.number(),
+});
+
+const draftPassResultValidator = v.object({
+  draftJson: v.string(),
+  sourcePaths: v.array(v.string()),
+});
+
+const validationResultValidator = v.object({
+  assistantText: v.string(),
+  citationEntries: v.array(citationEntryValidator),
+  issues: v.array(v.string()),
+  isValid: v.boolean(),
+});
+
+const repairPassResultValidator = v.object({
+  assistantText: v.string(),
+  citationEntries: v.array(citationEntryValidator),
+});
+
 function cleanModelText(text?: string): string {
   if (!text) return "";
   return parseThinkTags(text).content.trim();
@@ -85,7 +109,7 @@ async function listSourcePathsForPapers(
         paperId: paper._id,
       }),
     ),
-  )) as { relativePath: string }[][];
+  )).map((files) => files.map((f) => ({ relativePath: f.relativePath })));
 
   const relativePaths: string[] = [];
   for (const files of fileLists) {
@@ -417,7 +441,7 @@ async function runGroundingPass(
     ctx,
     {},
   );
-  await ctx.runMutation(api.threads.updateAgentThread, {
+  await ctx.runMutation(internal.threads.updateAgentThread, {
     id: threadId,
     agentThreadId: groundingThreadId,
   });
@@ -449,7 +473,7 @@ async function runRepairPass(
   const { threadId } = await paperGroundingAgent.createThread(ctx, {});
   // Point the user-facing thread at the repair agent thread so the client
   // can subscribe to streaming deltas for this pass too.
-  await ctx.runMutation(api.threads.updateAgentThread, {
+  await ctx.runMutation(internal.threads.updateAgentThread, {
     id: userThreadId,
     agentThreadId: threadId,
   });
@@ -478,6 +502,7 @@ export const startChat = action({
     message: v.string(),
     model: v.optional(v.string()),
   },
+  returns: v.null(),
   handler: async (ctx, { threadId, message, model }) => {
     // Snapshot paper context before anything else
     const thread = await ctx.runQuery(api.threads.get, { id: threadId });
@@ -516,6 +541,7 @@ export const startChat = action({
       });
       throw e;
     }
+    return null;
   },
 });
 
@@ -527,6 +553,7 @@ export const draftPass = internalAction({
     paperIds: v.array(v.string()),
     generation: v.number(),
   },
+  returns: draftPassResultValidator,
   handler: async (ctx, { threadId, message, model, paperIds, generation }) => {
     const thread = await ctx.runQuery(api.threads.get, { id: threadId });
     if (!thread || thread.chatGeneration !== generation) {
@@ -564,13 +591,18 @@ export const groundAndValidate = internalAction({
     paperIds: v.array(v.string()),
     generation: v.number(),
   },
+  returns: validationResultValidator,
   handler: async (ctx, { threadId, draftJson, sourcePaths, model, paperIds, generation }) => {
     const thread = await ctx.runQuery(api.threads.get, { id: threadId });
     if (!thread || thread.chatGeneration !== generation) {
       throw new Error("Chat generation stale");
     }
     const { papers } = await loadPaperContext(ctx, paperIds);
-    const draft = JSON.parse(draftJson) as DraftAnswer;
+    const parsed: unknown = JSON.parse(draftJson);
+    if (!parsed || typeof parsed !== "object" || !("claims" in parsed)) {
+      throw new Error("Invalid draft answer format");
+    }
+    const draft = parsed as DraftAnswer;
     const languageModel = resolveModel(model);
 
     const assistantText = await runGroundingPass(
@@ -613,6 +645,7 @@ export const repairPass = internalAction({
     paperIds: v.array(v.string()),
     generation: v.number(),
   },
+  returns: repairPassResultValidator,
   handler: async (
     ctx,
     { threadId, draftJson, invalidText, issues, sourcePaths, model, paperIds, generation },
@@ -622,7 +655,11 @@ export const repairPass = internalAction({
       throw new Error("Chat generation stale");
     }
     const { papers } = await loadPaperContext(ctx, paperIds);
-    const draft = JSON.parse(draftJson) as DraftAnswer;
+    const parsed: unknown = JSON.parse(draftJson);
+    if (!parsed || typeof parsed !== "object" || !("claims" in parsed)) {
+      throw new Error("Invalid draft answer format");
+    }
+    const draft = parsed as DraftAnswer;
     const languageModel = resolveModel(model);
 
     const repairedText = await runRepairPass(
@@ -681,4 +718,3 @@ export const repairPass = internalAction({
     };
   },
 });
-

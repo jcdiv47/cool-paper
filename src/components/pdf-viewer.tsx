@@ -247,6 +247,14 @@ export function PdfViewer({
     api.paperChunks.listByPage,
     paper ? { paperId: paper._id, page: selectionPage } : "skip",
   );
+  const selectionPageRef = useRef(selectionPage);
+  const selectionPageChunksRef = useRef(selectionPageChunks);
+
+  useEffect(() => {
+    selectionPageRef.current = selectionPage;
+    selectionPageChunksRef.current = selectionPageChunks;
+  }, [selectionPage, selectionPageChunks]);
+
   const focusedAnnotation = useMemo(
     () =>
       focusedAnnotationId
@@ -796,13 +804,16 @@ export function PdfViewer({
         return;
       }
 
+      const curSelectionPage = selectionPageRef.current;
+      const curSelectionPageChunks = selectionPageChunksRef.current;
+
       const anchor = resolveSelectionAnchor({
         pageElement: startPageEl,
         range,
         exactText,
         pageChunks:
-          page === selectionPage && selectionPageChunks
-            ? selectionPageChunks
+          page === curSelectionPage && curSelectionPageChunks
+            ? curSelectionPageChunks
             : undefined,
       });
 
@@ -829,7 +840,7 @@ export function PdfViewer({
       setCurrentPage(page);
       setPageInput(String(page));
     }, 0);
-  }, [selectionPage, selectionPageChunks]);
+  }, []);
 
   const handleAnnotationClick = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {

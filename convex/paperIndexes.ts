@@ -6,8 +6,19 @@ const sectionOutlineEntryValidator = v.object({
   startPage: v.number(),
 });
 
+const paperIndexDocValidator = v.object({
+  _id: v.id("paper_indexes"),
+  _creationTime: v.number(),
+  paperId: v.id("papers"),
+  version: v.number(),
+  extractorVersion: v.string(),
+  createdAt: v.string(),
+  sectionOutline: v.optional(v.array(sectionOutlineEntryValidator)),
+});
+
 export const getByPaperVersion = query({
   args: { paperId: v.id("papers"), version: v.number() },
+  returns: v.union(paperIndexDocValidator, v.null()),
   handler: async (ctx, { paperId, version }) => {
     return await ctx.db
       .query("paper_indexes")
@@ -20,14 +31,16 @@ export const getByPaperVersion = query({
 
 export const getActiveForPaper = query({
   args: { paperId: v.id("papers") },
+  returns: v.union(paperIndexDocValidator, v.null()),
   handler: async (ctx, { paperId }) => {
     const paper = await ctx.db.get(paperId);
-    if (!paper?.activeIndexVersion) return null;
+    if (!paper || paper.activeIndexVersion === undefined) return null;
+    const activeIndexVersion = paper.activeIndexVersion;
 
     return await ctx.db
       .query("paper_indexes")
       .withIndex("by_paperId_version", (q) =>
-        q.eq("paperId", paperId).eq("version", paper.activeIndexVersion!)
+        q.eq("paperId", paperId).eq("version", activeIndexVersion)
       )
       .first();
   },
@@ -38,12 +51,13 @@ export const getSectionOutline = query({
   returns: v.array(sectionOutlineEntryValidator),
   handler: async (ctx, { paperId }) => {
     const paper = await ctx.db.get(paperId);
-    if (!paper?.activeIndexVersion) return [];
+    if (!paper || paper.activeIndexVersion === undefined) return [];
+    const activeIndexVersion = paper.activeIndexVersion;
 
     const index = await ctx.db
       .query("paper_indexes")
       .withIndex("by_paperId_version", (q) =>
-        q.eq("paperId", paperId).eq("version", paper.activeIndexVersion!)
+        q.eq("paperId", paperId).eq("version", activeIndexVersion)
       )
       .first();
 
@@ -59,6 +73,7 @@ export const create = mutation({
     createdAt: v.string(),
     sectionOutline: v.optional(v.array(sectionOutlineEntryValidator)),
   },
+  returns: v.id("paper_indexes"),
   handler: async (ctx, args) => {
     const existing = await ctx.db
       .query("paper_indexes")
@@ -88,6 +103,7 @@ export const setActiveVersion = mutation({
     paperId: v.id("papers"),
     version: v.number(),
   },
+  returns: v.union(v.id("paper_indexes"), v.null()),
   handler: async (ctx, { paperId, version }) => {
     const index = await ctx.db
       .query("paper_indexes")

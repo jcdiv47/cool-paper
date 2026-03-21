@@ -65,10 +65,17 @@ export const refreshIfStale = action({
         );
       }
 
-      const body = (await response.json()) as OpenRouterModelsResponse;
-      const rawModels = Array.isArray(body.data) ? body.data : [];
+      const body: unknown = await response.json();
+      if (!body || typeof body !== "object") {
+        throw new Error("Invalid response from OpenRouter models API");
+      }
+      const { data } = body as OpenRouterModelsResponse;
+      const rawModels = Array.isArray(data) ? data : [];
       const entries = rawModels
-        .map((model) => normalizeOpenRouterModel(model as Record<string, unknown>))
+        .filter((model): model is Record<string, unknown> =>
+          model != null && typeof model === "object"
+        )
+        .map((model) => normalizeOpenRouterModel(model))
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
       const fetchedAt = Date.now();

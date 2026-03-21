@@ -1,8 +1,42 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+const threadDocValidator = v.object({
+  _id: v.id("threads"),
+  _creationTime: v.number(),
+  title: v.string(),
+  paperIds: v.array(v.string()),
+  solePaperId: v.optional(v.string()),
+  model: v.optional(v.string()),
+  sessionId: v.optional(v.string()),
+  agentThreadId: v.optional(v.string()),
+  chatStatus: v.optional(v.union(v.literal("generating"), v.literal("error"))),
+  chatError: v.optional(v.string()),
+  chatGeneration: v.optional(v.number()),
+  messageCount: v.optional(v.number()),
+  preview: v.optional(v.string()),
+  createdAt: v.string(),
+  updatedAt: v.string(),
+});
+
+const threadListItemValidator = v.object({
+  _id: v.id("threads"),
+  id: v.id("threads"),
+  title: v.string(),
+  updatedAt: v.string(),
+  messageCount: v.number(),
+  preview: v.optional(v.string()),
+  paperIds: v.array(v.string()),
+  paperTitles: v.array(v.string()),
+});
+
+function getSolePaperId(paperIds: string[]) {
+  return paperIds.length === 1 ? paperIds[0] : undefined;
+}
+
 export const list = query({
   args: {},
+  returns: v.array(threadListItemValidator),
   handler: async (ctx) => {
     const threads = await ctx.db
       .query("threads")
@@ -12,16 +46,8 @@ export const list = query({
 
     const results = [];
     for (const thread of threads) {
-      // Count messages
-      const messages = await ctx.db
-        .query("messages")
-        .withIndex("by_threadId", (q) => q.eq("threadId", thread._id))
-        .collect();
-
       // Skip empty threads
-      if (messages.length === 0) continue;
-
-      const lastMsg = messages[messages.length - 1];
+      if (!thread.messageCount) continue;
 
       // Resolve paper titles
       const paperTitles: string[] = [];
@@ -38,8 +64,8 @@ export const list = query({
         id: thread._id,
         title: thread.title,
         updatedAt: thread.updatedAt,
-        messageCount: messages.length,
-        preview: lastMsg?.content.slice(0, 100),
+        messageCount: thread.messageCount,
+        preview: thread.preview,
         paperIds: thread.paperIds,
         paperTitles,
       });
@@ -51,6 +77,7 @@ export const list = query({
 
 export const get = query({
   args: { id: v.id("threads") },
+  returns: v.union(threadDocValidator, v.null()),
   handler: async (ctx, { id }) => {
     return await ctx.db.get(id);
   },
@@ -58,17 +85,13 @@ export const get = query({
 
 export const getByPaperId = query({
   args: { paperId: v.string() },
+  returns: v.union(threadDocValidator, v.null()),
   handler: async (ctx, { paperId }) => {
-    const threads = await ctx.db
+    return await ctx.db
       .query("threads")
-      .withIndex("by_updatedAt")
+      .withIndex("by_solePaperId_updatedAt", (q) => q.eq("solePaperId", paperId))
       .order("desc")
-      .collect();
-    return (
-      threads.find(
-        (t) => t.paperIds.length === 1 && t.paperIds[0] === paperId
-      ) ?? null
-    );
+      .first();
   },
 });
 
@@ -81,13 +104,20 @@ export const create = mutation({
     createdAt: v.string(),
     updatedAt: v.string(),
   },
+  returns: v.id("threads"),
   handler: async (ctx, args) => {
-    return await ctx.db.insert("threads", args);
+    return await ctx.db.insert("threads", {
+      ...args,
+      solePaperId: getSolePaperId(args.paperIds),
+      messageCount: 0,
+      preview: undefined,
+    });
   },
 });
 
 export const remove = mutation({
   args: { id: v.id("threads") },
+  returns: v.null(),
   handler: async (ctx, { id }) => {
     // Cascade delete messages
     const messages = await ctx.db
@@ -105,6 +135,7 @@ export const remove = mutation({
       await ctx.db.delete(msg._id);
     }
     await ctx.db.delete(id);
+    return null;
   },
 });
 
@@ -115,33 +146,44 @@ export const updateSession = mutation({
     model: v.optional(v.string()),
     updatedAt: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, { id, sessionId, model, updatedAt }) => {
-    const patch: Record<string, unknown> = { updatedAt };
+    const patch: {
+      updatedAt: string;
+      sessionId?: string;
+      model?: string;
+    } = { updatedAt };
     if (sessionId !== undefined) patch.sessionId = sessionId;
     if (model !== undefined) patch.model = model;
     await ctx.db.patch(id, patch);
+    return null;
   },
 });
 
 export const updateTitle = mutation({
   args: { id: v.id("threads"), title: v.string() },
+  returns: v.null(),
   handler: async (ctx, { id, title }) => {
     await ctx.db.patch(id, { title });
+    return null;
   },
 });
 
-export const updateAgentThread = mutation({
+export const updateAgentThread = internalMutation({
   args: {
     id: v.id("threads"),
     agentThreadId: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, { id, agentThreadId }) => {
     await ctx.db.patch(id, { agentThreadId });
+    return null;
   },
 });
 
 export const setChatGenerating = internalMutation({
   args: { id: v.id("threads") },
+  returns: v.number(),
   handler: async (ctx, { id }) => {
     const thread = await ctx.db.get(id);
     const generation = (thread?.chatGeneration ?? 0) + 1;
@@ -156,16 +198,19 @@ export const setChatGenerating = internalMutation({
 
 export const clearChatStatus = internalMutation({
   args: { id: v.id("threads") },
+  returns: v.null(),
   handler: async (ctx, { id }) => {
     await ctx.db.patch(id, {
       chatStatus: undefined,
       chatError: undefined,
     });
+    return null;
   },
 });
 
 export const cancelChat = mutation({
   args: { id: v.id("threads") },
+  returns: v.null(),
   handler: async (ctx, { id }) => {
     const thread = await ctx.db.get(id);
     if (thread?.chatStatus === "generating") {
@@ -175,18 +220,22 @@ export const cancelChat = mutation({
         chatGeneration: (thread.chatGeneration ?? 0) + 1,
       });
     }
+    return null;
   },
 });
 
 export const updatePapers = mutation({
   args: { id: v.id("threads"), paperIds: v.array(v.string()) },
+  returns: v.null(),
   handler: async (ctx, { id, paperIds }) => {
     await ctx.db.patch(id, {
       paperIds,
+      solePaperId: getSolePaperId(paperIds),
       updatedAt: new Date().toISOString(),
       // Clear session and streaming thread since paper context changed.
       sessionId: undefined,
       agentThreadId: undefined,
     });
+    return null;
   },
 });

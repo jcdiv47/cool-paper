@@ -57,8 +57,7 @@ interface ActivityHeatmapProps {
 export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const calRef = useRef<any>(null);
+  const calRef = useRef<{ paint: (...args: unknown[]) => void; destroy: () => void } | null>(null);
 
   useEffect(() => {
     let destroyed = false;

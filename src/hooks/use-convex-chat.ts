@@ -307,7 +307,9 @@ export function useConvexChat(): UseConvexChatReturn {
   const cancelStream = useCallback(() => {
     abortRef.current = true;
     if (threadId) {
-      cancelChatMut({ id: threadId as Id<"threads"> });
+      cancelChatMut({ id: threadId as Id<"threads"> }).catch(() => {
+        // Cancel is best-effort; mutation failure is non-critical
+      });
     }
   }, [threadId, cancelChatMut]);
 

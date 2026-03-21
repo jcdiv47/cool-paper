@@ -3,6 +3,17 @@
 const MIN_SELECTION_CHARS = 4;
 const ANNOTATION_CONTEXT_CHARS = 96;
 
+interface BoundedChunk {
+  start: number;
+  end: number;
+}
+
+function hasBounds<T extends { start?: number; end?: number }>(
+  chunk: T
+): chunk is T & BoundedChunk {
+  return chunk.start !== undefined && chunk.end !== undefined;
+}
+
 export interface PageTextRange {
   start: number;
   end: number;
@@ -99,26 +110,24 @@ export function resolveChunkRefId(
 
   if (start !== undefined && end !== undefined) {
     const containing = pageChunks
+      .filter(hasBounds)
       .filter(
         (chunk) =>
-          chunk.start !== undefined &&
-          chunk.end !== undefined &&
           chunk.start <= start &&
           chunk.end >= end
       )
-      .sort((a, b) => (a.end! - a.start!) - (b.end! - b.start!));
+      .sort((a, b) => (a.end - a.start) - (b.end - b.start));
 
     if (containing[0]) return containing[0].refId;
 
     const overlapping = pageChunks
+      .filter(hasBounds)
       .filter(
         (chunk) =>
-          chunk.start !== undefined &&
-          chunk.end !== undefined &&
           chunk.end > start &&
           chunk.start < end
       )
-      .sort((a, b) => (b.end! - b.start!) - (a.end! - a.start!));
+      .sort((a, b) => (b.end - b.start) - (a.end - a.start));
 
     if (overlapping[0]) return overlapping[0].refId;
   }
@@ -202,21 +211,24 @@ export function resolveAnnotationSpanIndexes(
     end?: number;
   }
 ): number[] {
-  let start = annotation.start;
-  let end = annotation.end;
+  let resolvedStart = annotation.start;
+  let resolvedEnd = annotation.end;
 
-  if (start === undefined || end === undefined) {
+  if (resolvedStart === undefined || resolvedEnd === undefined) {
     const exactNorm = normalizePdfText(annotation.exact);
     if (!exactNorm) return [];
 
-    const resolvedStart = model.normalizedText.indexOf(exactNorm);
-    if (resolvedStart < 0) return [];
+    const idx = model.normalizedText.indexOf(exactNorm);
+    if (idx < 0) return [];
 
-    start = resolvedStart;
-    end = resolvedStart + exactNorm.length;
+    resolvedStart = idx;
+    resolvedEnd = idx + exactNorm.length;
   }
 
+  const start = resolvedStart;
+  const end = resolvedEnd;
+
   return model.ranges
-    .map((range, index) => (range.end > start! && range.start < end! ? index : -1))
+    .map((range, index) => (range.end > start && range.start < end ? index : -1))
     .filter((index) => index >= 0);
 }

@@ -1,7 +1,7 @@
 import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import {
-  getConfiguredModelsWithEffectiveIds,
+  getConfiguredModelsStatic,
   type ModelPickerAvailability,
   type ModelPickerQueryResult,
   modelPickerQueryResultValidator,
@@ -25,7 +25,7 @@ export const listForPicker = query({
     const hasSnapshot = Boolean(cache?.fetchedAt);
 
     return {
-      models: getConfiguredModelsWithEffectiveIds().map((model) => {
+      models: getConfiguredModelsStatic().map((model) => {
         const metadata = entryMap.get(model.effectiveModelId);
         const availability: ModelPickerAvailability = hasSnapshot
           ? metadata

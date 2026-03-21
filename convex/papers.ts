@@ -1,6 +1,23 @@
-import { query, mutation, type MutationCtx } from "./_generated/server";
+import { query, mutation, internalMutation, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+
+const paperDocValidator = v.object({
+  _id: v.id("papers"),
+  _creationTime: v.number(),
+  arxivId: v.string(),
+  sanitizedId: v.string(),
+  title: v.string(),
+  authors: v.array(v.string()),
+  abstract: v.string(),
+  summary: v.optional(v.string()),
+  published: v.string(),
+  categories: v.array(v.string()),
+  addedAt: v.string(),
+  activeIndexVersion: v.optional(v.number()),
+  pdfStorageId: v.optional(v.id("_storage")),
+  importStatus: v.optional(v.string()),
+});
 
 async function removePaperArtifacts(
   ctx: MutationCtx,
@@ -77,6 +94,7 @@ async function removePaperArtifacts(
 
 export const list = query({
   args: {},
+  returns: v.array(paperDocValidator),
   handler: async (ctx) => {
     return await ctx.db
       .query("papers")
@@ -88,6 +106,7 @@ export const list = query({
 
 export const get = query({
   args: { sanitizedId: v.string() },
+  returns: v.union(paperDocValidator, v.null()),
   handler: async (ctx, { sanitizedId }) => {
     return await ctx.db
       .query("papers")
@@ -98,6 +117,7 @@ export const get = query({
 
 export const getPdfUrl = query({
   args: { storageId: v.id("_storage") },
+  returns: v.union(v.string(), v.null()),
   handler: async (ctx, { storageId }) => {
     return await ctx.storage.getUrl(storageId);
   },
@@ -105,6 +125,7 @@ export const getPdfUrl = query({
 
 export const getById = query({
   args: { id: v.id("papers") },
+  returns: v.union(paperDocValidator, v.null()),
   handler: async (ctx, { id }) => {
     return await ctx.db.get(id);
   },
@@ -122,6 +143,7 @@ export const create = mutation({
     categories: v.array(v.string()),
     addedAt: v.string(),
   },
+  returns: v.id("papers"),
   handler: async (ctx, args) => {
     // Check if paper already exists
     const existing = await ctx.db
@@ -135,43 +157,51 @@ export const create = mutation({
 
 export const remove = mutation({
   args: { id: v.id("papers") },
+  returns: v.null(),
   handler: async (ctx, { id }) => {
     const paper = await ctx.db.get(id);
-    if (!paper) return;
+    if (!paper) return null;
 
     await removePaperArtifacts(ctx, id, paper.sanitizedId);
 
     await ctx.db.delete(id);
+    return null;
   },
 });
 
-export const updateImportStatus = mutation({
+export const updateImportStatus = internalMutation({
   args: {
     id: v.id("papers"),
     importStatus: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, { id, importStatus }) => {
     await ctx.db.patch(id, { importStatus });
+    return null;
   },
 });
 
-export const updateSummary = mutation({
+export const updateSummary = internalMutation({
   args: {
     id: v.id("papers"),
     summary: v.string(),
   },
+  returns: v.null(),
   handler: async (ctx, { id, summary }) => {
     await ctx.db.patch(id, { summary });
+    return null;
   },
 });
 
-export const updatePdfStorage = mutation({
+export const updatePdfStorage = internalMutation({
   args: {
     id: v.id("papers"),
     pdfStorageId: v.id("_storage"),
   },
+  returns: v.null(),
   handler: async (ctx, { id, pdfStorageId }) => {
     await ctx.db.patch(id, { pdfStorageId });
+    return null;
   },
 });
 
@@ -180,15 +210,17 @@ export const removeBySanitizedId = mutation({
     sanitizedId: v.string(),
     excludeJobId: v.optional(v.id("jobs")),
   },
+  returns: v.null(),
   handler: async (ctx, { sanitizedId, excludeJobId }) => {
     const paper = await ctx.db
       .query("papers")
       .withIndex("by_sanitizedId", (q) => q.eq("sanitizedId", sanitizedId))
       .first();
-    if (!paper) return;
+    if (!paper) return null;
 
     await removePaperArtifacts(ctx, paper._id, sanitizedId, excludeJobId);
 
     await ctx.db.delete(paper._id);
+    return null;
   },
 });

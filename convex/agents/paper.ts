@@ -9,6 +9,9 @@ import type { ActionCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { Tool } from "ai";
 
+// NOTE: This module accesses process.env and must only be imported from
+// "use node" runtime files (actions/chat.ts, actions/importPaper.ts).
+
 // --- OpenRouter provider ---
 
 function getOpenRouterProvider() {
@@ -27,6 +30,18 @@ function getOpenRouterProvider() {
       ? { baseURL: process.env.OPENROUTER_BASE_URL }
       : {}),
   });
+}
+
+/**
+ * Placeholder language model — always overridden at runtime via the `model`
+ * option passed to each agent. The double cast is required because
+ * @openrouter/ai-sdk-provider returns LanguageModelV1 which is structurally
+ * compatible but nominally incompatible with LanguageModelV2.
+ */
+function placeholderModel(): LanguageModelV2 {
+  return getOpenRouterProvider().chat(
+    "qwen/qwen3.5-35b-a3b"
+  ) as unknown as LanguageModelV2;
 }
 
 // --- Model resolution ---
@@ -111,7 +126,6 @@ export function annotationRules() {
 
 type ToolCtx = AgentToolCtx & Pick<ActionCtx, "runQuery">;
 type SourceFileDoc = Doc<"paper_source_files">;
-type ChunkDoc = Doc<"paper_chunks">;
 type AnnotationDoc = Doc<"annotations">;
 type ReadSourceFileTool = Tool<
   { paperId: string; relativePath: string },
@@ -335,7 +349,7 @@ const getChunksByPage: GetChunksByPageTool = createTool<
       paperId: paperId as Id<"papers">,
       page,
     });
-    return chunks.map((chunk: ChunkDoc) => ({
+    return chunks.map((chunk) => ({
       refId: chunk.refId,
       page: chunk.page,
       order: chunk.order,
@@ -406,7 +420,7 @@ const groundingPaperTools = {
 // at runtime via the `model` option in generateText().
 export const paperAgent = new Agent(components.agent, {
   name: "paper-assistant",
-  languageModel: getOpenRouterProvider().chat("qwen/qwen3.5-35b-a3b") as unknown as LanguageModelV2,
+  languageModel: placeholderModel(),
   instructions: `You are an expert academic paper analyst. You help build accurate internal drafts about research papers.
 
   ${toolWorkflow()}
@@ -419,7 +433,7 @@ export const paperAgent = new Agent(components.agent, {
 
 export const paperSummaryAgent = new Agent(components.agent, {
   name: "paper-summary-assistant",
-  languageModel: getOpenRouterProvider().chat("qwen/qwen3.5-35b-a3b") as unknown as LanguageModelV2,
+  languageModel: placeholderModel(),
   instructions: `You are an expert academic paper reader creating an internal structured reading-guide draft.
 
   Prioritize TeX source files when they are available. Use PDF evidence only as a fallback when the source files are incomplete.
@@ -431,7 +445,7 @@ export const paperSummaryAgent = new Agent(components.agent, {
 
 export const paperGroundingAgent = new Agent(components.agent, {
   name: "paper-grounding-assistant",
-  languageModel: getOpenRouterProvider().chat("qwen/qwen3.5-35b-a3b") as unknown as LanguageModelV2,
+  languageModel: placeholderModel(),
   instructions: `You are an expert academic paper analyst grounding draft claims to the paper PDF.
 
 ${groundingWorkflow()}

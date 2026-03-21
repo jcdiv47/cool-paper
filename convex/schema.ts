@@ -20,6 +20,9 @@ export default defineSchema({
     addedAt: v.string(),
     activeIndexVersion: v.optional(v.number()),
     pdfStorageId: v.optional(v.id("_storage")),
+    // Import status values: "queued", "downloading_pdf", "downloading_source",
+    // "building_index", "generating_summary", "completed", or "failed: <reason>".
+    // Uses v.string() because "failed:" prefix carries a dynamic error message.
     importStatus: v.optional(v.string()),
   })
     .index("by_arxivId", ["arxivId"])
@@ -29,15 +32,21 @@ export default defineSchema({
   threads: defineTable({
     title: v.string(),
     paperIds: v.array(v.string()),
+    solePaperId: v.optional(v.string()),
     model: v.optional(v.string()),
     sessionId: v.optional(v.string()),
     agentThreadId: v.optional(v.string()),
     chatStatus: v.optional(v.union(v.literal("generating"), v.literal("error"))),
     chatError: v.optional(v.string()),
     chatGeneration: v.optional(v.number()),
+    messageCount: v.optional(v.number()),
+    preview: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
-  }).index("by_updatedAt", ["updatedAt"]),
+  })
+    .index("by_updatedAt", ["updatedAt"])
+    .index("by_solePaperId", ["solePaperId"])
+    .index("by_solePaperId_updatedAt", ["solePaperId", "updatedAt"]),
 
   messages: defineTable({
     threadId: v.id("threads"),
@@ -106,6 +115,7 @@ export default defineSchema({
     page: v.number(),
     order: v.number(),
     section: v.optional(v.string()),
+    sectionSearchText: v.string(),
     text: v.string(),
     normText: v.string(),
     prefix: v.optional(v.string()),
@@ -115,7 +125,16 @@ export default defineSchema({
   })
     .index("by_paperId_indexVersion", ["paperId", "indexVersion"])
     .index("by_paperId_indexVersion_refId", ["paperId", "indexVersion", "refId"])
-    .index("by_paperId_page", ["paperId", "page"]),
+    .index("by_paperId_page", ["paperId", "page"])
+    .index("by_paperId_indexVersion_page", ["paperId", "indexVersion", "page"])
+    .searchIndex("search_normText", {
+      searchField: "normText",
+      filterFields: ["paperId", "indexVersion", "page"],
+    })
+    .searchIndex("search_section", {
+      searchField: "sectionSearchText",
+      filterFields: ["paperId", "indexVersion", "page"],
+    }),
 
   message_citations: defineTable({
     messageId: v.id("messages"),

@@ -3,6 +3,10 @@
  * No filesystem or Node.js dependencies — safe for Convex actions.
  */
 
+// String.prototype.toWellFormed() — ES2024, may not be in TS lib target.
+// Use a local type alias to avoid conflicts with built-in String definitions.
+type MaybeWellFormed = { toWellFormed?: () => string };
+
 export const EVIDENCE_INDEX_VERSION = 1;
 export const EVIDENCE_EXTRACTOR_VERSION = "pdfjs-paragraph-v1";
 const MAX_CHUNK_CHARS = 650;
@@ -23,8 +27,8 @@ export interface EvidenceChunkRecord {
 }
 
 function toWellFormedText(text: string): string {
-  if (typeof (text as unknown as { toWellFormed?: () => string }).toWellFormed === "function") {
-    return (text as unknown as { toWellFormed: () => string }).toWellFormed();
+  if (typeof (text as MaybeWellFormed).toWellFormed === "function") {
+    return (text as MaybeWellFormed).toWellFormed!();
   }
 
   let out = "";

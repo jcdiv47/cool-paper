@@ -16,6 +16,7 @@ export const persistChatResult = internalMutation({
     model: v.optional(v.string()),
     generation: v.number(),
   },
+  returns: v.union(v.id("messages"), v.null()),
   handler: async (ctx, { threadId, assistantText, citationEntries, model, generation }) => {
     const thread = await ctx.db.get(threadId);
     if (!thread || thread.chatGeneration !== generation) return null;
@@ -41,6 +42,8 @@ export const persistChatResult = internalMutation({
     await ctx.db.patch(threadId, {
       model,
       updatedAt: now,
+      messageCount: (thread.messageCount ?? 0) + 1,
+      preview: assistantText.slice(0, 100),
       chatStatus: undefined,
       chatError: undefined,
     });
@@ -55,13 +58,15 @@ export const markChatFailed = internalMutation({
     error: v.string(),
     generation: v.number(),
   },
+  returns: v.null(),
   handler: async (ctx, { threadId, error, generation }) => {
     const thread = await ctx.db.get(threadId);
-    if (!thread || thread.chatGeneration !== generation) return;
+    if (!thread || thread.chatGeneration !== generation) return null;
 
     await ctx.db.patch(threadId, {
       chatStatus: "error",
       chatError: error.slice(0, 500),
     });
+    return null;
   },
 });

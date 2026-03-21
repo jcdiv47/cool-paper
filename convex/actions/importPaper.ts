@@ -66,6 +66,15 @@ const SUMMARY_SECTIONS = [
   "Q6. A quick summary of the paper.",
 ] as const;
 
+const queuedStatusValidator = v.object({
+  status: v.string(),
+});
+
+const importPaperResultValidator = v.object({
+  paperId: v.string(),
+  status: v.string(),
+});
+
 function cleanModelText(text?: string): string {
   if (!text) return "";
   return parseThinkTags(text).content.trim();
@@ -268,9 +277,11 @@ async function validateSummaryCitations(
     return validateCitations([], content, false);
   }
 
+  const indexVersion = paper.activeIndexVersion; // already narrowed by guard above
+
   const chunks = await ctx.runQuery(api.paperChunks.getByRefIds, {
     paperId: paper._id,
-    indexVersion: paper.activeIndexVersion,
+    indexVersion,
     refIds: uniqueRefIds,
   });
 
@@ -278,7 +289,7 @@ async function validateSummaryCitations(
     chunks.map((chunk: { refId: string }) => ({
       refId: chunk.refId,
       paperId: String(paper._id),
-      indexVersion: paper.activeIndexVersion!,
+      indexVersion,
     })),
     content,
     false,
@@ -540,6 +551,7 @@ export const retryImport = action({
   args: {
     sanitizedId: v.string(),
   },
+  returns: queuedStatusValidator,
   handler: async (ctx, { sanitizedId }): Promise<{ status: string }> => {
     const paper = await ctx.runQuery(api.papers.get, { sanitizedId });
     if (!paper) {
@@ -549,7 +561,7 @@ export const retryImport = action({
       throw new Error("Paper is not in failed state");
     }
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paper._id,
       importStatus: "queued",
     });
@@ -568,6 +580,7 @@ export const importPaper = action({
   args: {
     arxivId: v.string(),
   },
+  returns: importPaperResultValidator,
   handler: async (ctx, { arxivId }): Promise<{ paperId: string; status: string }> => {
     const sanitizedId = sanitizeArxivId(arxivId);
     const existing = await ctx.runQuery(api.papers.get, { sanitizedId });
@@ -588,7 +601,7 @@ export const importPaper = action({
       addedAt: new Date().toISOString(),
     });
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paperId,
       importStatus: "queued",
     });
@@ -609,10 +622,11 @@ export const ingestPaperAssets = internalAction({
     arxivId: v.string(),
     sanitizedId: v.string(),
   },
-  handler: async (ctx, { paperId, arxivId, sanitizedId }): Promise<void> => {
+  returns: v.null(),
+  handler: async (ctx, { paperId, arxivId, sanitizedId }) => {
     let sourceFiles: SourceFile[] = [];
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paperId,
       importStatus: "downloading_pdf",
     });
@@ -627,12 +641,12 @@ export const ingestPaperAssets = internalAction({
     const pdfBuffer = await pdfRes.arrayBuffer();
     const pdfBlob = new Blob([pdfBuffer], { type: "application/pdf" });
     const pdfStorageId = await ctx.storage.store(pdfBlob);
-    await ctx.runMutation(api.papers.updatePdfStorage, {
+    await ctx.runMutation(internal.papers.updatePdfStorage, {
       id: paperId,
       pdfStorageId,
     });
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paperId,
       importStatus: "downloading_source",
     });
@@ -671,7 +685,7 @@ export const ingestPaperAssets = internalAction({
       console.warn(`Failed to download TeX source for ${arxivId}:`, error);
     }
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paperId,
       importStatus: "building_index",
     });
@@ -708,6 +722,7 @@ export const ingestPaperAssets = internalAction({
         });
       }
     }
+    return null;
   },
 });
 
@@ -715,13 +730,14 @@ export const generatePaperSummary = internalAction({
   args: {
     paperId: v.id("papers"),
   },
-  handler: async (ctx, { paperId }): Promise<void> => {
+  returns: v.null(),
+  handler: async (ctx, { paperId }) => {
     const paper = await ctx.runQuery(api.papers.getById, { id: paperId });
     if (!paper) {
       throw new Error("Paper not found");
     }
 
-    await ctx.runMutation(api.papers.updateImportStatus, {
+    await ctx.runMutation(internal.papers.updateImportStatus, {
       id: paperId,
       importStatus: "generating_summary",
     });
@@ -774,9 +790,10 @@ export const generatePaperSummary = internalAction({
       guide = buildSummaryFallbackGuide();
     }
 
-    await ctx.runMutation(api.papers.updateSummary, {
+    await ctx.runMutation(internal.papers.updateSummary, {
       id: paperId,
       summary: guide,
     });
+    return null;
   },
 });

@@ -44,7 +44,9 @@ export function PaperChatDrawer({
 
     initializedRef.current = true;
     if (existingThread) {
-      chat.loadThread(existingThread._id);
+      chat.loadThread(existingThread._id).catch((err) => {
+        console.error("Failed to load thread:", err);
+      });
     } else {
       chat.setPaperIds([paperId]);
     }

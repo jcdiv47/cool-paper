@@ -101,7 +101,9 @@ export default function ActiveChatPage({
   }
 
   function handleRemovePaper(paperId: string) {
-    chat.removePaper(paperId);
+    chat.removePaper(paperId).catch(() => {
+      toast.error("Failed to remove paper");
+    });
   }
 
   // Derive thread title from chat state
