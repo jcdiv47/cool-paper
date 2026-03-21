@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import "cal-heatmap/cal-heatmap.css";
-import type { PaperMetadata } from "@/types";
 
 const CACHE_KEY = "activity-heatmap-cache";
 
@@ -29,68 +28,28 @@ function writeCache(data: { date: number; value: number }[]) {
   }
 }
 
-function buildHeatmapData(
-  papers: PaperMetadata[]
-): { date: number; value: number }[] {
-  const counts: Record<string, number> = {};
-
-  function addDate(isoString: string) {
-    const d = new Date(isoString);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    counts[key] = (counts[key] || 0) + 1;
-  }
-
-  papers.forEach((p) => {
-    if (p.addedAt) addDate(p.addedAt);
-  });
-
-  return Object.entries(counts).map(([dateStr, value]) => ({
-    date: Math.floor(new Date(dateStr).getTime() / 1000),
-    value,
-  }));
-}
-
 interface ActivityHeatmapProps {
-  papers: PaperMetadata[];
+  /** Pre-computed heatmap data from the backend (enriched: papers + threads + annotations) */
+  data?: { date: number; value: number }[];
 }
 
-export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
+export function ActivityHeatmap({ data: externalData }: ActivityHeatmapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
   const calRef = useRef<{ paint: (...args: unknown[]) => void; destroy: () => void } | null>(null);
-
-  // Track the current range so we only re-render when the breakpoint changes
   const rangeRef = useRef<number>(0);
 
-  // Derive a stable key from addedAt dates only — the sole field the heatmap
-  // uses.  During import the importStatus changes but addedAt stays the same,
-  // so the memoised data keeps its reference and the effect won't re-run.
-  const addedAtKey = useMemo(
-    () =>
-      papers
-        .map((p) => p.addedAt ?? "")
-        .sort()
-        .join(","),
-    [papers]
-  );
-
-  const heatmapData = useMemo(() => {
-    const data = buildHeatmapData(papers);
-    if (data.length > 0) writeCache(data);
-    return data;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by addedAt values
-  }, [addedAtKey]);
+  // Cache external data when it arrives
+  const heatmapData = externalData ?? [];
+  if (heatmapData.length > 0) writeCache(heatmapData);
 
   useEffect(() => {
     let destroyed = false;
 
-    // Use cached data for instant render, or built from papers
     const cached = readCache();
-
     const dataToUse = heatmapData.length > 0 ? heatmapData : cached?.data ?? null;
     if (!dataToUse) return;
 
-    // Modules loaded once, reused on resize
     let modules: {
       CalHeatmap: typeof import("cal-heatmap")["default"];
       Tooltip: unknown;
@@ -99,7 +58,6 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
     } | null = null;
 
     function getRange() {
-      // lg breakpoint = 1024px (Tailwind default)
       return window.innerWidth >= 1024 ? 10 : 5;
     }
 
@@ -122,16 +80,12 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
       if (destroyed || !containerRef.current || !legendRef.current) return;
 
       const range = getRange();
-
-      // Skip if breakpoint hasn't changed
       if (rangeRef.current === range && calRef.current) return;
       rangeRef.current = range;
 
-      // Destroy previous instance
       calRef.current?.destroy();
 
       const { CalHeatmap, Tooltip, LegendLite, CalendarLabel } = modules;
-
       const cal = new CalHeatmap();
       calRef.current = cal;
 
@@ -153,17 +107,13 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
             color: {
               type: "threshold",
               range: ["#132a2a", "#1a4040", "#257070", "#35b0a0"],
-              domain: [1, 2, 3],
+              domain: [1, 2, 4],
             },
           },
           domain: {
             type: "month",
             gutter: 4,
-            label: {
-              text: "MMM",
-              textAlign: "start",
-              position: "top",
-            },
+            label: { text: "MMM", textAlign: "start", position: "top" },
           },
           subDomain: {
             type: "ghDay",
@@ -185,7 +135,7 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
               ) {
                 return (
                   (value ? value : "No") +
-                  " contributions on " +
+                  " activities on " +
                   dayjsDate.format("dddd, MMMM D, YYYY")
                 );
               },
@@ -217,16 +167,11 @@ export function ActivityHeatmap({ papers }: ActivityHeatmapProps) {
 
     paint();
 
-    // Re-paint when crossing the breakpoint on resize
     function onResize() {
-      const newRange = getRange();
-      if (newRange !== rangeRef.current) {
-        paint();
-      }
+      if (getRange() !== rangeRef.current) paint();
     }
 
     window.addEventListener("resize", onResize);
-
     return () => {
       destroyed = true;
       window.removeEventListener("resize", onResize);

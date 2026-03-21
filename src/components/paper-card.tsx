@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Loader2, AlertTriangle, RotateCcw } from "lucide-react";
+import { Trash2, Loader2, AlertTriangle, RotateCcw, MessageCircle, Highlighter } from "lucide-react";
 import { stageLabel } from "@/lib/import-status";
 import type { PaperMetadata } from "@/types";
 
@@ -23,6 +23,8 @@ interface PaperCardProps {
   onDelete: (arxivId: string) => void;
   onRetry?: (arxivId: string) => void;
   index: number;
+  threadCount?: number;
+  annotationCount?: number;
 }
 
 export function PaperCard({
@@ -30,6 +32,8 @@ export function PaperCard({
   onDelete,
   onRetry,
   index,
+  threadCount,
+  annotationCount,
 }: PaperCardProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const sanitizedId = paper.arxivId.replace(/\//g, "_");
@@ -144,6 +148,26 @@ export function PaperCard({
                 </span>
               ))}
             </div>
+
+            {/* Engagement stats (optional) */}
+            {(threadCount !== undefined && threadCount > 0) || (annotationCount !== undefined && annotationCount > 0) ? (
+              <div className="flex items-center gap-3 pt-1.5 border-t border-border/20">
+                {threadCount !== undefined && threadCount > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                    <MessageCircle className="h-2.5 w-2.5" />
+                    <span className="tabular-nums">{threadCount}</span>
+                    <span>chats</span>
+                  </div>
+                )}
+                {annotationCount !== undefined && annotationCount > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+                    <Highlighter className="h-2.5 w-2.5" />
+                    <span className="tabular-nums">{annotationCount}</span>
+                    <span>notes</span>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </Card>
       </Link>
