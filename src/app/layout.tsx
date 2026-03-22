@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Lora } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
+import { AuthGate } from "@/components/auth-gate";
 import { MobileNav } from "@/components/mobile-nav";
 import { CommandPaletteProvider } from "@/components/command-palette-provider";
 import "./globals.css";
@@ -36,12 +38,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} antialiased`}
       >
-        <ConvexClientProvider>
-          <CommandPaletteProvider>
-            {children}
-            <MobileNav />
-          </CommandPaletteProvider>
-        </ConvexClientProvider>
+        <ClerkProvider>
+          <ConvexClientProvider>
+            <AuthGate>
+              <CommandPaletteProvider>
+                {children}
+                <MobileNav />
+              </CommandPaletteProvider>
+            </AuthGate>
+          </ConvexClientProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

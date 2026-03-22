@@ -2,6 +2,7 @@
 
 import { Search, ChevronRight, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { DESKTOP_NAV } from "@/lib/nav";
@@ -128,6 +129,7 @@ export function Header({
         )}
         <div className="flex flex-1 items-center justify-end gap-2">
           {children}
+          <UserButton />
         </div>
       </div>
       {/* Secondary toolbar (mobile only) */}
