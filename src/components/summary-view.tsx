@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { FileText, MessageCircle, RefreshCw } from "lucide-react";
@@ -16,6 +16,8 @@ interface SummaryViewProps {
   compact?: boolean;
   onViewPdf?: () => void;
   onNavigate?: (href: string) => void;
+  /** Mutable ref kept by the parent so scroll position survives unmount/remount. */
+  scrollTopRef?: React.MutableRefObject<number>;
 }
 
 export function SummaryView({
@@ -23,6 +25,7 @@ export function SummaryView({
   compact = false,
   onViewPdf,
   onNavigate,
+  scrollTopRef,
 }: SummaryViewProps) {
   const router = useRouter();
   const regenerateSummary = useRegenerateSummary();
@@ -92,9 +95,28 @@ export function SummaryView({
     ? "mx-auto max-w-3xl px-5 py-6 sm:px-6 sm:py-7"
     : "mx-auto max-w-3xl px-6 py-10 sm:px-10 sm:py-14";
 
+  // --- Scroll position persistence across unmount/remount ---
+  const scrollElRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollTopRef && scrollElRef.current) {
+      scrollTopRef.current = scrollElRef.current.scrollTop;
+    }
+  }, [scrollTopRef]);
+
+  useEffect(() => {
+    if (scrollTopRef && scrollElRef.current && scrollTopRef.current) {
+      scrollElRef.current.scrollTop = scrollTopRef.current;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- restore once on mount
+
   return (
     <div className="flex h-full flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+      <div
+        ref={scrollElRef}
+        onScroll={handleScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
+      >
         <div className={containerCls}>
           {/* Paper metadata — always visible */}
           <h1

@@ -25,6 +25,10 @@ interface PaperChatDrawerProps {
   className?: string;
   /** When set, scroll chat to the message containing this refId. */
   scrollToRefId?: string;
+  /** Pre-fill text for the chat input (e.g. from "Ask AI" in PDF). */
+  initialMessage?: string;
+  /** Called after the initialMessage has been consumed by the chat input. */
+  onInitialMessageConsumed?: () => void;
 }
 
 export function PaperChatDrawer({
@@ -36,6 +40,8 @@ export function PaperChatDrawer({
   mode = "sheet",
   className,
   scrollToRefId,
+  initialMessage,
+  onInitialMessageConsumed,
 }: PaperChatDrawerProps) {
   const chat = useConvexChat();
   const router = useRouter();
@@ -89,6 +95,8 @@ export function PaperChatDrawer({
       hidePaperCards
       activeCiteRefId={activeCiteRefId}
       scrollToRefId={scrollToRefId}
+      prefillInput={initialMessage}
+      onPrefillConsumed={onInitialMessageConsumed}
       onGoToChat={chat.threadId ? handleGoToChat : undefined}
       onNewChat={handleNewChat}
     />

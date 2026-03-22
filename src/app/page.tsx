@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { motion, useReducedMotion } from "framer-motion";
@@ -102,27 +102,39 @@ export default function Home() {
 
   const deletePaper = useDeletePaper();
   const retryImport = useRetryImport();
+  const deletePaperTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ---- Keyboard shortcut ----
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
-        setAddOpen(true);
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  // Cmd+K now handled globally by CommandPaletteProvider
 
-  async function handleDelete(arxivId: string) {
+  function handleDelete(arxivId: string) {
     const sanitized = arxivId.replace(/\//g, "_");
-    try {
-      await deletePaper(sanitized);
-      toast.success("Paper removal queued");
-    } catch {
-      toast.error("Failed to delete paper");
-    }
+    if (deletePaperTimerRef.current) clearTimeout(deletePaperTimerRef.current);
+
+    const timer = setTimeout(async () => {
+      deletePaperTimerRef.current = null;
+      try {
+        await deletePaper(sanitized);
+        toast.success("Paper removed");
+      } catch {
+        toast.error("Failed to delete paper");
+      }
+    }, 5000);
+
+    deletePaperTimerRef.current = timer;
+
+    toast("Paper will be deleted.", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (deletePaperTimerRef.current) {
+            clearTimeout(deletePaperTimerRef.current);
+            deletePaperTimerRef.current = null;
+          }
+          toast.success("Paper deletion cancelled");
+        },
+      },
+      duration: 5000,
+    });
   }
 
   async function handleRetry(arxivId: string) {

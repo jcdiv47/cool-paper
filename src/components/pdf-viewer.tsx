@@ -47,7 +47,6 @@ import {
   StickyNote,
   Trash2,
   PenLine,
-  PanelRight,
   MessageCircle,
   Image,
   List,
@@ -66,6 +65,14 @@ import {
   resolveSelectionAnchor,
   type PageTextModel,
 } from "@/lib/pdf-annotations";
+import {
+  HIGHLIGHT_COLORS,
+  DEFAULT_HIGHLIGHT_COLOR,
+  DEFAULT_NOTE_COLOR,
+  getAnnotationCssClass,
+} from "@/lib/annotation-colors";
+import { AnnotationsPanel } from "@/components/annotations-panel";
+import { PdfMinimap } from "@/components/pdf-minimap";
 import { api } from "../../convex/_generated/api";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -118,6 +125,8 @@ interface PdfViewerProps {
   chatOpen?: boolean;
   /** Called when user clicks "Back to chat" after navigating to a citation. */
   onReturnToChat?: (refId: string) => void;
+  /** Called when user clicks "Ask AI" in the selection toolbar with the selected text. */
+  onAskAI?: (selectedText: string) => void;
 }
 
 interface PendingSelection {
@@ -271,19 +280,12 @@ function OutlineNode({
   );
 }
 
-function annotationKindLabel(kind: "highlight" | "note") {
-  return kind === "note" ? "Note" : "Highlight";
-}
-
-function annotationToneClass(kind: "highlight" | "note") {
-  return kind === "note" ? "pdf-annotation-note" : "pdf-annotation-highlight";
-}
-
 export function PdfViewer({
   paperId,
   onToggleChat,
   chatOpen,
   onReturnToChat,
+  onAskAI,
 }: PdfViewerProps) {
   const searchParams = useSearchParams();
   const citeRefId = searchParams.get("cite");
@@ -342,6 +344,9 @@ export function PdfViewer({
   const [deletingAnnotationId, setDeletingAnnotationId] = useState<
     string | null
   >(null);
+  const [selectedColor, setSelectedColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
+  const [editColor, setEditColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
+  const pendingDeleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   // Layout measurements
   const [cWidth, setCWidth] = useState(0);
@@ -756,15 +761,12 @@ export function PdfViewer({
   useEffect(() => {
     for (const pageEl of pageEls.current.values()) {
       const annotated = pageEl.querySelectorAll(
-        ".pdf-annotation-highlight, .pdf-annotation-note, .pdf-annotation-active",
+        "[class*='pdf-annotation-']",
       );
       for (const node of annotated) {
         if (node instanceof HTMLElement) {
-          node.classList.remove(
-            "pdf-annotation-highlight",
-            "pdf-annotation-note",
-            "pdf-annotation-active",
-          );
+          const toRemove = [...node.classList].filter((c) => c.startsWith("pdf-annotation-"));
+          for (const cls of toRemove) node.classList.remove(cls);
           delete node.dataset.annotationId;
         }
       }
@@ -795,7 +797,7 @@ export function PdfViewer({
           for (const index of spanIndexes) {
             const span = model.spans[index];
             if (!span) continue;
-            span.classList.add(annotationToneClass(annotation.kind));
+            span.classList.add(getAnnotationCssClass(annotation.color, annotation.kind));
             if (annotation.annotationId === focusedAnnotationId) {
               span.classList.add("pdf-annotation-active");
             }
@@ -1027,6 +1029,7 @@ export function PdfViewer({
       if (!annotation) return;
       setEditingAnnotationId(annotationId);
       setEditComment(annotation.comment ?? "");
+      setEditColor(annotation.color ?? DEFAULT_HIGHLIGHT_COLOR);
       setEditDialogOpen(true);
       setContextMenu(null);
     },
@@ -1044,6 +1047,7 @@ export function PdfViewer({
       await updateAnnotation({
         id: annotation._id,
         comment: editComment.trim() || undefined,
+        color: editColor,
         updatedAt: new Date().toISOString(),
       });
       setEditDialogOpen(false);
@@ -1081,7 +1085,7 @@ export function PdfViewer({
           indexVersion: paper.activeIndexVersion,
           kind,
           authorType: "user",
-          color: kind === "note" ? "sky" : "amber",
+          color: selectedColor,
           comment: comment?.trim() || undefined,
           chunkRefId,
           page: pendingSelection.page,
@@ -1112,26 +1116,47 @@ export function PdfViewer({
   );
 
   const deleteAnnotation = useCallback(
-    async (annotationId: string) => {
+    (annotationId: string) => {
       const annotation = annotations.find(
         (candidate) => candidate.annotationId === annotationId,
       );
       if (!annotation) return;
 
+      // Cancel any existing pending delete for this annotation
+      const existingTimer = pendingDeleteTimers.current.get(annotationId);
+      if (existingTimer) clearTimeout(existingTimer);
+
       setDeletingAnnotationId(annotationId);
-      try {
-        await removeAnnotation({ id: annotation._id });
-        if (focusedAnnotationId === annotationId) {
-          setFocusedAnnotationId(null);
+
+      const timer = setTimeout(async () => {
+        pendingDeleteTimers.current.delete(annotationId);
+        try {
+          await removeAnnotation({ id: annotation._id });
+          if (focusedAnnotationId === annotationId) {
+            setFocusedAnnotationId(null);
+          }
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : "Failed to remove annotation.",
+          );
+        } finally {
+          setDeletingAnnotationId(null);
         }
-        toast.success("Annotation removed.");
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to remove annotation.",
-        );
-      } finally {
-        setDeletingAnnotationId(null);
-      }
+      }, 5000);
+
+      pendingDeleteTimers.current.set(annotationId, timer);
+
+      toast("Annotation removed.", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            clearTimeout(timer);
+            pendingDeleteTimers.current.delete(annotationId);
+            setDeletingAnnotationId(null);
+          },
+        },
+        duration: 5000,
+      });
     },
     [annotations, focusedAnnotationId, removeAnnotation],
   );
@@ -1478,9 +1503,19 @@ export function PdfViewer({
             annotations={annotations}
             focusedAnnotationId={focusedAnnotationId}
             deletingAnnotationId={deletingAnnotationId}
+            loading={annotationsResult === undefined}
             onJump={(annotationId, page) => focusAnnotation(annotationId, page)}
             onDelete={(annotationId) => void deleteAnnotation(annotationId)}
             onClose={() => setAnnotationsOpen(false)}
+          />
+        )}
+        {numPages > 0 && (
+          <PdfMinimap
+            numPages={numPages}
+            currentPage={currentPage}
+            annotations={annotations.map((a) => ({ page: a.page, color: a.color, kind: a.kind }))}
+            viewportRatio={cHeight > 0 && pageHeight > 0 ? cHeight / (pageHeight * numPages) : 0.1}
+            onJumpToPage={goTo}
           />
         )}
       </Document>
@@ -1494,6 +1529,23 @@ export function PdfViewer({
           }}
           onMouseDown={(event) => event.preventDefault()}
         >
+          <div className="flex items-center gap-1">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setSelectedColor(c.id)}
+                className={cn(
+                  "h-4.5 w-4.5 rounded-full border-2 transition-all",
+                  selectedColor === c.id
+                    ? "border-foreground scale-110"
+                    : "border-transparent hover:border-foreground/40",
+                )}
+                style={{ background: c.dot }}
+                title={c.label}
+              />
+            ))}
+          </div>
+          <div className="mx-0.5 h-4 w-px bg-border/50" />
           <Button
             size="xs"
             variant="secondary"
@@ -1507,11 +1559,31 @@ export function PdfViewer({
             size="xs"
             variant="outline"
             disabled={savingAnnotation}
-            onClick={() => setNoteDialogOpen(true)}
+            onClick={() => {
+              setSelectedColor(DEFAULT_NOTE_COLOR);
+              setNoteDialogOpen(true);
+            }}
           >
             <StickyNote className="h-3.5 w-3.5" />
             Add note
           </Button>
+          {onAskAI && (
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={savingAnnotation}
+              onClick={() => {
+                const text = pendingSelection?.exact;
+                if (text) {
+                  onAskAI(text);
+                  resetSelection();
+                }
+              }}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Ask AI
+            </Button>
+          )}
           <Button
             size="icon-xs"
             variant="ghost"
@@ -1535,6 +1607,23 @@ export function PdfViewer({
           <div className="space-y-3">
             <div className="max-h-32 overflow-y-auto border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
               {pendingSelection?.exact}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground mr-1">Category:</span>
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedColor(c.id)}
+                  className={cn(
+                    "h-5 w-5 rounded-full border-2 transition-all",
+                    selectedColor === c.id
+                      ? "border-foreground scale-110"
+                      : "border-transparent hover:border-foreground/40",
+                  )}
+                  style={{ background: c.dot }}
+                  title={c.label}
+                />
+              ))}
             </div>
             <Textarea
               value={noteComment}
@@ -1620,6 +1709,23 @@ export function PdfViewer({
                 </div>
               ) : null;
             })()}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground mr-1">Category:</span>
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setEditColor(c.id)}
+                  className={cn(
+                    "h-5 w-5 rounded-full border-2 transition-all",
+                    editColor === c.id
+                      ? "border-foreground scale-110"
+                      : "border-transparent hover:border-foreground/40",
+                  )}
+                  style={{ background: c.dot }}
+                  title={c.label}
+                />
+              ))}
+            </div>
             <Textarea
               value={editComment}
               onChange={(event) => setEditComment(event.target.value)}
@@ -1652,117 +1758,6 @@ export function PdfViewer({
           Back to chat
         </button>
       )}
-    </div>
-  );
-}
-
-function AnnotationsPanel({
-  annotations,
-  focusedAnnotationId,
-  deletingAnnotationId,
-  onJump,
-  onDelete,
-  onClose,
-}: {
-  annotations: Array<{
-    annotationId: string;
-    kind: "highlight" | "note";
-    page: number;
-    exact: string;
-    comment?: string;
-    createdAt: string;
-  }>;
-  focusedAnnotationId: string | null;
-  deletingAnnotationId: string | null;
-  onJump: (annotationId: string, page: number) => void;
-  onDelete: (annotationId: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex w-72 shrink-0 flex-col border-l border-border/30 bg-muted/10">
-      <div className="flex h-10 items-center justify-between border-b border-border/30 px-3">
-        <div className="flex items-center gap-2">
-          <PanelRight className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Annotations
-          </span>
-          <span className="text-xs tabular-nums text-muted-foreground/60">
-            {annotations.length}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="rounded p-0.5 text-muted-foreground hover:text-foreground"
-          aria-label="Close annotations panel"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="flex-1 space-y-1.5 overflow-y-auto p-2">
-        {annotations.length === 0 ? (
-          <div className="border border-dashed border-border/70 bg-muted/15 px-4 py-10 text-center text-sm text-muted-foreground">
-            Select text in the PDF to save your first highlight or note.
-          </div>
-        ) : (
-          annotations.map((annotation) => (
-            <div
-              key={annotation.annotationId}
-              onClick={() => onJump(annotation.annotationId, annotation.page)}
-              onKeyDown={(event) => {
-                if (event.target !== event.currentTarget) return;
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onJump(annotation.annotationId, annotation.page);
-                }
-              }}
-              role="button"
-              tabIndex={0}
-              className={cn(
-                "annotation-card w-full text-left",
-                focusedAnnotationId === annotation.annotationId &&
-                  "annotation-card-active",
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className={cn(
-                      "inline-block h-2 w-2 shrink-0",
-                      annotation.kind === "note"
-                        ? "bg-[rgba(73,171,255,0.7)]"
-                        : "bg-[rgba(255,204,51,0.8)]",
-                    )} />
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      {annotationKindLabel(annotation.kind)} · p.{annotation.page}
-                    </p>
-                  </div>
-                  {annotation.comment && (
-                    <p className="line-clamp-2 text-xs font-medium text-foreground">
-                      {annotation.comment}
-                    </p>
-                  )}
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {annotation.exact}
-                  </p>
-                </div>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="annotation-card-delete shrink-0 opacity-0"
-                  disabled={deletingAnnotationId === annotation.annotationId}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDelete(annotation.annotationId);
-                  }}
-                  aria-label="Delete annotation"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }

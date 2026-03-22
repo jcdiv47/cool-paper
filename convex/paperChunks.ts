@@ -357,3 +357,54 @@ export const appendForIndex = mutation({
     return chunks.length;
   },
 });
+
+export const searchGlobal = query({
+  args: {
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      refId: v.string(),
+      page: v.number(),
+      text: v.string(),
+      section: v.optional(v.string()),
+      sanitizedId: v.string(),
+      paperTitle: v.string(),
+    }),
+  ),
+  handler: async (ctx, { query: queryText, limit = 20 }) => {
+    if (queryText.trim().length < 2) return [];
+
+    const chunks = await ctx.db
+      .query("paper_chunks")
+      .withSearchIndex("search_normText", (q) =>
+        q.search("normText", queryText.toLowerCase())
+      )
+      .take(limit * 2); // Fetch extra to account for filtering
+
+    const paperCache = new Map();
+    const results = [];
+    for (const chunk of chunks) {
+      if (results.length >= limit) break;
+
+      let paper = paperCache.get(String(chunk.paperId));
+      if (!paper) {
+        paper = await ctx.db.get(chunk.paperId);
+        if (paper) paperCache.set(String(chunk.paperId), paper);
+      }
+      if (!paper) continue;
+      if (chunk.indexVersion !== paper.activeIndexVersion) continue;
+
+      results.push({
+        refId: chunk.refId,
+        page: chunk.page,
+        text: chunk.text,
+        section: chunk.section,
+        sanitizedId: paper.sanitizedId,
+        paperTitle: paper.title,
+      });
+    }
+    return results;
+  },
+});

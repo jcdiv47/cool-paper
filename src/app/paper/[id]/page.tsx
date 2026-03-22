@@ -5,6 +5,7 @@ import {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   use,
 } from "react";
 import {
@@ -20,6 +21,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Trash2,
+  Link2,
+  PanelLeftClose,
 } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import { Header } from "@/components/header";
@@ -37,6 +40,8 @@ import { PaperChatDrawer } from "@/components/paper-chat-drawer";
 import { useDeletePaper, useRetryImport } from "@/hooks/use-paper-actions";
 import { parseImportStatus, stageLabel } from "@/lib/import-status";
 import type { PaperMetadata } from "@/types";
+
+const WIDE_MEDIA_QUERY = "(min-width: 1440px)";
 
 function PdfSkeleton() {
   return <div className="flex h-full items-center justify-center bg-muted/10 animate-pulse" />;
@@ -74,10 +79,17 @@ export default function PaperPage({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
+  const isWide = useMediaQuery(WIDE_MEDIA_QUERY);
   // Mobile panel state — used for the bottom sheet approach on mobile
   const [mobilePanel, setMobilePanel] = useState<"chat" | null>(null);
   // Tracks the refId to scroll-to in chat (set by "Back to chat" button in PDF viewer)
   const [scrollToRefId, setScrollToRefId] = useState<string | undefined>(undefined);
+  // Text selected in PDF to pre-fill chat input
+  const [askAIText, setAskAIText] = useState<string | undefined>(undefined);
+  // Paper delete undo timer
+  const deletePaperTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Persists summary scroll position across mode switches (survives SummaryView unmount/remount)
+  const summaryScrollRef = useRef(0);
 
   const convexPaper = useQuery(api.papers.get, { sanitizedId: id });
   const loading = convexPaper === undefined;
@@ -111,18 +123,40 @@ export default function PaperPage({
     }
   }, [retryImport, id]);
 
-  const handleDeletePaper = useCallback(async () => {
-    try {
-      await deletePaper(id);
-      toast.success("Paper removal queued");
-      router.push("/");
-    } catch {
-      toast.error("Failed to delete paper");
-    }
+  const handleDeletePaper = useCallback(() => {
+    if (deletePaperTimerRef.current) clearTimeout(deletePaperTimerRef.current);
+
+    const timer = setTimeout(async () => {
+      deletePaperTimerRef.current = null;
+      try {
+        await deletePaper(id);
+        toast.success("Paper removed");
+        router.push("/");
+      } catch {
+        toast.error("Failed to delete paper");
+      }
+    }, 5000);
+
+    deletePaperTimerRef.current = timer;
+
+    toast("Paper will be deleted.", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (deletePaperTimerRef.current) {
+            clearTimeout(deletePaperTimerRef.current);
+            deletePaperTimerRef.current = null;
+          }
+          toast.success("Paper deletion cancelled");
+        },
+      },
+      duration: 5000,
+    });
   }, [deletePaper, id, router]);
 
   // --- URL-derived state ---
-  const view = searchParams.get("view") === "pdf" ? "pdf" : "summary";
+  const viewParam = searchParams.get("view");
+  const view = viewParam === "pdf" ? "pdf" : viewParam === "split" ? "split" : "summary";
   const chatOpen = searchParams.has("chat");
 
   // --- URL helpers ---
@@ -169,13 +203,13 @@ export default function PaperPage({
     (href: string) => {
       const url = new URL(href, window.location.origin);
       updateUrl({
-        view: "pdf",
+        view: view === "split" ? "split" : "pdf",
         page: url.searchParams.get("page"),
         cite: url.searchParams.get("cite"),
         annotation: url.searchParams.get("annotation"),
       });
     },
-    [updateUrl],
+    [updateUrl, view],
   );
 
   const handleReturnToChat = useCallback(
@@ -190,6 +224,24 @@ export default function PaperPage({
 
   // Extract the actual refId from the scroll-to key (strip the timestamp suffix)
   const scrollToRefIdClean = scrollToRefId?.split("::")[0];
+
+  const handleAskAI = useCallback(
+    (selectedText: string) => {
+      const prefill = `What does this mean?\n\n> ${selectedText}`;
+      setAskAIText(prefill);
+      updateUrl({ chat: "1" });
+    },
+    [updateUrl],
+  );
+
+  // Cancel paper delete timer on unmount
+  useEffect(() => {
+    return () => {
+      if (deletePaperTimerRef.current) {
+        clearTimeout(deletePaperTimerRef.current);
+      }
+    };
+  }, []);
 
   // --- Keyboard shortcuts ---
   useEffect(() => {
@@ -253,7 +305,51 @@ export default function PaperPage({
           { label: "Papers", href: "/paper" },
           { label: paper.title, href: `/paper/${id}` },
         ]}
-      />
+      >
+        <div className="flex items-center gap-1">
+          {isWide && paper.importState.phase === "completed" && (
+            <>
+              <Button
+                variant={view === "summary" ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => updateUrl({ view: null })}
+              >
+                Summary
+              </Button>
+              <Button
+                variant={view === "pdf" ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => updateUrl({ view: "pdf" })}
+              >
+                PDF
+              </Button>
+              <Button
+                variant={view === "split" ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => updateUrl({ view: "split" })}
+              >
+                <PanelLeftClose className="h-3.5 w-3.5" />
+                Split
+              </Button>
+              <div className="mx-1 h-4 w-px bg-border/50" />
+            </>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href).then(
+                () => toast.success("Link copied to clipboard!"),
+                () => toast.error("Failed to copy link"),
+              );
+            }}
+          >
+            <Link2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Share</span>
+          </Button>
+        </div>
+      </Header>
 
       {/* Import status banner */}
       {paper.importState.phase === "importing" && (
@@ -281,18 +377,40 @@ export default function PaperPage({
 
       {/* Main content */}
       <main className="min-h-0 flex-1 overflow-hidden bg-muted/5">
-        {view === "pdf" ? (
+        {view === "split" && isWide ? (
+          <div className="flex h-full">
+            <div className="flex-1 min-w-0 overflow-hidden border-r border-border/30">
+              <SummaryView
+                paper={paper}
+                onViewPdf={() => updateUrl({ view: "pdf" })}
+                onNavigate={handleCitationNavigate}
+                scrollTopRef={summaryScrollRef}
+              />
+            </div>
+            <div className="flex-1 min-w-0 overflow-hidden" style={{ minWidth: 500 }}>
+              <LazyPdfViewer
+                paperId={id}
+                onToggleChat={handleToggleChat}
+                chatOpen={chatOpen}
+                onReturnToChat={handleReturnToChat}
+                onAskAI={handleAskAI}
+              />
+            </div>
+          </div>
+        ) : view === "pdf" ? (
           <LazyPdfViewer
             paperId={id}
             onToggleChat={isDesktop ? handleToggleChat : undefined}
             chatOpen={chatOpen}
             onReturnToChat={handleReturnToChat}
+            onAskAI={handleAskAI}
           />
         ) : (
           <SummaryView
             paper={paper}
             onViewPdf={() => updateUrl({ view: "pdf" })}
             onNavigate={handleCitationNavigate}
+            scrollTopRef={summaryScrollRef}
           />
         )}
       </main>
@@ -309,6 +427,8 @@ export default function PaperPage({
           onCitationNavigate={handleCitationNavigate}
           mode="sheet"
           scrollToRefId={scrollToRefIdClean}
+          initialMessage={askAIText}
+          onInitialMessageConsumed={() => setAskAIText(undefined)}
         />
       )}
 
@@ -349,6 +469,8 @@ export default function PaperPage({
                     mode="inline"
                     className="min-h-0 flex-1"
                     scrollToRefId={scrollToRefIdClean}
+                    initialMessage={askAIText}
+                    onInitialMessageConsumed={() => setAskAIText(undefined)}
                   />
                 )}
               </div>

@@ -84,6 +84,20 @@ export function ModelPickerDialog({
 
         <ScrollArea className="max-h-[65vh]">
           <div className="space-y-3 px-4 py-4 sm:px-6">
+            {models.length === 0 ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="rounded-xl border border-border/20 p-4 space-y-2">
+                    <div className="h-4 w-1/3 animate-shimmer rounded-lg" />
+                    <div className="h-3 w-2/3 animate-shimmer rounded-lg" />
+                    <div className="flex gap-2">
+                      <div className="h-5 w-16 animate-shimmer rounded-full" />
+                      <div className="h-5 w-20 animate-shimmer rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {[...models].sort((a, b) => {
               if (a.id === selectedModel) return -1;
               if (b.id === selectedModel) return 1;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -209,14 +209,37 @@ export default function PaperListPage() {
     }
   }, [retryImport]);
 
-  const handleDelete = useCallback(async (arxivId: string) => {
+  const deletePaperTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDelete = useCallback((arxivId: string) => {
     const sanitized = arxivId.replace(/\//g, "_");
-    try {
-      await deletePaper(sanitized);
-      toast.success("Paper removal queued");
-    } catch {
-      toast.error("Failed to delete paper");
-    }
+    if (deletePaperTimerRef.current) clearTimeout(deletePaperTimerRef.current);
+
+    const timer = setTimeout(async () => {
+      deletePaperTimerRef.current = null;
+      try {
+        await deletePaper(sanitized);
+        toast.success("Paper removed");
+      } catch {
+        toast.error("Failed to delete paper");
+      }
+    }, 5000);
+
+    deletePaperTimerRef.current = timer;
+
+    toast("Paper will be deleted.", {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          if (deletePaperTimerRef.current) {
+            clearTimeout(deletePaperTimerRef.current);
+            deletePaperTimerRef.current = null;
+          }
+          toast.success("Paper deletion cancelled");
+        },
+      },
+      duration: 5000,
+    });
   }, [deletePaper]);
 
   return (

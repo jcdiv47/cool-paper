@@ -282,6 +282,76 @@
   outline: 2px solid rgba(0, 200, 180, 0.55);
   box-shadow: 0 0 0 4px rgba(0, 200, 180, 0.18);
 }
+/* ─── Per-color annotation highlights ─── */
+.pdf-annotation-color-amber {
+  background: rgba(255,204,51,0.25) !important;
+  border-bottom: 2px solid rgba(255,204,51,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.pdf-annotation-color-rose {
+  background: rgba(255,100,130,0.25) !important;
+  border-bottom: 2px solid rgba(255,100,130,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.pdf-annotation-color-violet {
+  background: rgba(167,139,250,0.25) !important;
+  border-bottom: 2px solid rgba(167,139,250,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.pdf-annotation-color-sky {
+  background: rgba(0,160,220,0.25) !important;
+  border-bottom: 2px solid rgba(0,160,220,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.pdf-annotation-color-emerald {
+  background: rgba(52,211,153,0.25) !important;
+  border-bottom: 2px solid rgba(52,211,153,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.pdf-annotation-color-slate {
+  background: rgba(148,163,184,0.25) !important;
+  border-bottom: 2px solid rgba(148,163,184,0.45);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+/* ─── PDF minimap ─── */
+.pdf-minimap {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 20;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+.pdf-minimap:hover {
+  opacity: 1;
+}
+.pdf-minimap-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(0, 200, 180, 0.15);
+  border: 1px solid rgba(0, 200, 180, 0.3);
+  border-radius: 2px;
+  transition: top 0.1s ease;
+}
+.pdf-minimap-dot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
 .pdf-selection-toolbar {
   position: fixed;
   z-index: 40;

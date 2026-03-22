@@ -66,6 +66,10 @@ interface ChatViewProps {
   onGoToChat?: () => void;
   /** Create a new chat with the same paper(s). */
   onNewChat?: () => void;
+  /** Pre-fill text for the chat input (e.g. from "Ask AI" in PDF). */
+  prefillInput?: string;
+  /** Called after prefillInput has been consumed. */
+  onPrefillConsumed?: () => void;
 }
 
 const SINGLE_SUGGESTIONS = [
@@ -302,6 +306,8 @@ export function ChatView({
   scrollToRefId,
   onGoToChat,
   onNewChat,
+  prefillInput,
+  onPrefillConsumed,
 }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
@@ -371,6 +377,17 @@ export function ChatView({
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }, []);
+
+  // Pre-fill input from external source (e.g. "Ask AI" in PDF viewer)
+  useEffect(() => {
+    if (!prefillInput) return;
+    setInput(prefillInput);
+    onPrefillConsumed?.();
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      resizeTextarea();
+    });
+  }, [prefillInput, onPrefillConsumed, resizeTextarea]);
 
   // Scroll to a specific citation refId (triggered by "Back to chat" from PDF viewer)
   useEffect(() => {

@@ -3,7 +3,7 @@ export type ReaderPanel = "summary" | "chat" | "none";
 interface PaperWorkspaceHrefOptions {
   panel?: ReaderPanel;
   chat?: boolean;
-  view?: "pdf" | "summary";
+  view?: "pdf" | "summary" | "split";
   page?: string | number | null;
   cite?: string | null;
   annotation?: string | null;
@@ -27,6 +27,8 @@ export function buildPaperWorkspaceHref(
   const view = options.view ?? (options.cite || options.annotation ? "pdf" : undefined);
   if (view === "pdf") {
     params.set("view", "pdf");
+  } else if (view === "split") {
+    params.set("view", "split");
   }
 
   if (options.page !== undefined && options.page !== null) {

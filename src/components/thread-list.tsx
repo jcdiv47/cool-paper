@@ -30,7 +30,11 @@ export function ThreadList({ threads, loading, onSelect, onDelete }: ThreadListP
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-muted/20" />
+          <div key={i} className="rounded-xl border border-border/20 p-4 space-y-2">
+            <div className="h-4 w-3/4 animate-shimmer rounded-lg" />
+            <div className="h-3 w-1/2 animate-shimmer rounded-lg" />
+            <div className="h-3 w-1/3 animate-shimmer rounded-lg" />
+          </div>
         ))}
       </div>
     );

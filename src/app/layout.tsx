@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Lora } from "next/font/google";
 import { ConvexClientProvider } from "@/components/convex-client-provider";
 import { MobileNav } from "@/components/mobile-nav";
+import { CommandPaletteProvider } from "@/components/command-palette-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,8 +37,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} antialiased`}
       >
         <ConvexClientProvider>
-          {children}
-          <MobileNav />
+          <CommandPaletteProvider>
+            {children}
+            <MobileNav />
+          </CommandPaletteProvider>
         </ConvexClientProvider>
       </body>
     </html>
