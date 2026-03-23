@@ -16,6 +16,16 @@ import "react-pdf/dist/Page/TextLayer.css";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -344,9 +354,9 @@ export function PdfViewer({
   const [deletingAnnotationId, setDeletingAnnotationId] = useState<
     string | null
   >(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
   const [editColor, setEditColor] = useState(DEFAULT_HIGHLIGHT_COLOR);
-  const pendingDeleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   // Layout measurements
   const [cWidth, setCWidth] = useState(0);
@@ -1112,51 +1122,30 @@ export function PdfViewer({
         setSavingAnnotation(false);
       }
     },
-    [createAnnotation, paper, pendingSelection, resetSelection, selectionPageChunks],
+    [createAnnotation, paper, pendingSelection, resetSelection, selectedColor, selectionPageChunks],
   );
 
-  const deleteAnnotation = useCallback(
-    (annotationId: string) => {
+  const confirmDeleteAnnotation = useCallback(
+    async (annotationId: string) => {
       const annotation = annotations.find(
         (candidate) => candidate.annotationId === annotationId,
       );
       if (!annotation) return;
 
-      // Cancel any existing pending delete for this annotation
-      const existingTimer = pendingDeleteTimers.current.get(annotationId);
-      if (existingTimer) clearTimeout(existingTimer);
-
       setDeletingAnnotationId(annotationId);
-
-      const timer = setTimeout(async () => {
-        pendingDeleteTimers.current.delete(annotationId);
-        try {
-          await removeAnnotation({ id: annotation._id });
-          if (focusedAnnotationId === annotationId) {
-            setFocusedAnnotationId(null);
-          }
-        } catch (error) {
-          toast.error(
-            error instanceof Error ? error.message : "Failed to remove annotation.",
-          );
-        } finally {
-          setDeletingAnnotationId(null);
+      try {
+        await removeAnnotation({ id: annotation._id });
+        if (focusedAnnotationId === annotationId) {
+          setFocusedAnnotationId(null);
         }
-      }, 5000);
-
-      pendingDeleteTimers.current.set(annotationId, timer);
-
-      toast("Annotation removed.", {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            clearTimeout(timer);
-            pendingDeleteTimers.current.delete(annotationId);
-            setDeletingAnnotationId(null);
-          },
-        },
-        duration: 5000,
-      });
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to remove annotation.",
+        );
+      } finally {
+        setDeletingAnnotationId(null);
+        setConfirmDeleteId(null);
+      }
     },
     [annotations, focusedAnnotationId, removeAnnotation],
   );
@@ -1505,7 +1494,7 @@ export function PdfViewer({
             deletingAnnotationId={deletingAnnotationId}
             loading={annotationsResult === undefined}
             onJump={(annotationId, page) => focusAnnotation(annotationId, page)}
-            onDelete={(annotationId) => void deleteAnnotation(annotationId)}
+            onDelete={(annotationId) => setConfirmDeleteId(annotationId)}
             onClose={() => setAnnotationsOpen(false)}
           />
         )}
@@ -1667,7 +1656,7 @@ export function PdfViewer({
             className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-destructive hover:bg-destructive/10"
             disabled={deletingAnnotationId === contextMenu.annotationId}
             onClick={() => {
-              void deleteAnnotation(contextMenu.annotationId);
+              setConfirmDeleteId(contextMenu.annotationId);
               setContextMenu(null);
             }}
           >
@@ -1746,6 +1735,33 @@ export function PdfViewer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete annotation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deletingAnnotationId !== null}
+              onClick={(e) => {
+                e.preventDefault();
+                if (confirmDeleteId) void confirmDeleteAnnotation(confirmDeleteId);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* "Back to chat" floating pill — shown when viewing a citation from chat */}
       {citeRefId && onReturnToChat && (

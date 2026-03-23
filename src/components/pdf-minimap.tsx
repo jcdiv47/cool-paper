@@ -61,25 +61,12 @@ export function PdfMinimap({
 
   if (numPages === 0) return null;
 
-  const viewportHeight = Math.max(3, viewportRatio * 100);
-  const viewportTop = ((currentPage - 1) / numPages) * 100;
-
   return (
     <div
       ref={containerRef}
       className="pdf-minimap"
       onClick={handleClick}
     >
-      <div
-        className="pdf-minimap-viewport"
-        style={{
-          position: "absolute",
-          top: `${viewportTop}%`,
-          height: `${viewportHeight}%`,
-          left: 0,
-          right: 0,
-        }}
-      />
       {deduplicatedDots.map((dot) => (
         <div
           key={dot.key}
