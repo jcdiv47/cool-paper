@@ -47,21 +47,23 @@ function placeholderModel(): LanguageModelV2 {
 // --- Model resolution ---
 
 /**
- * Resolve an alias (e.g. "haiku") to the concrete model ID for the active
+ * Resolve an alias (e.g. "haiku") to a concrete language model for the active
  * provider.  Falls back to treating the value as a direct model ID if it
  * doesn't match any configured alias.
+ *
+ * When the matched ModelOption has `providerPreferences`, those are forwarded
+ * to the OpenRouter SDK so the request uses the configured provider routing.
+ * @see https://openrouter.ai/docs/guides/routing/provider-selection
  */
-function resolveModelId(alias?: string): string {
-  const id = alias?.trim() || DEFAULT_MODEL;
-  const option = MODEL_OPTIONS.find((m) => m.id === id);
-  if (!option) return id; // not a known alias → treat as raw model ID
-
-  return resolveEffectiveModelId(option);
-}
-
 export function resolveModel(modelId?: string) {
-  const name = resolveModelId(modelId);
-  return getOpenRouterProvider().chat(name);
+  const id = modelId?.trim() || DEFAULT_MODEL;
+  const option = MODEL_OPTIONS.find((m) => m.id === id);
+  const name = option ? resolveEffectiveModelId(option) : id;
+  const providerPreferences = option?.providerPreferences;
+
+  return getOpenRouterProvider().chat(name, {
+    ...(providerPreferences ? { provider: providerPreferences } : {}),
+  });
 }
 
 // --- Citation / annotation rules (shared prompts) ---

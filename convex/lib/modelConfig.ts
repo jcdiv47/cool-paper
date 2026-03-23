@@ -8,6 +8,17 @@
  * runtime without a redeploy (npx convex env set MODEL_HAIKU ...).
  */
 
+import type { OpenRouterChatSettings } from "@openrouter/ai-sdk-provider";
+
+/**
+ * OpenRouter provider routing preferences — extracted from the SDK's own type
+ * so it stays in sync automatically.
+ * @see https://openrouter.ai/docs/guides/routing/provider-selection
+ */
+export type ProviderPreferences = NonNullable<
+  OpenRouterChatSettings["provider"]
+>;
+
 export interface ModelOption {
   /** Alias stored in threads / passed through the API */
   id: string;
@@ -17,6 +28,8 @@ export interface ModelOption {
   modelId: string;
   /** Optional Convex env-var that overrides `modelId` at runtime */
   envOverride?: string;
+  /** OpenRouter provider routing preferences for this model */
+  providerPreferences?: ProviderPreferences;
 }
 
 export const MODEL_OPTIONS: ModelOption[] = [
@@ -24,32 +37,56 @@ export const MODEL_OPTIONS: ModelOption[] = [
     id: "anthropic/claude-haiku-4.5",
     label: "Haiku",
     modelId: "anthropic/claude-haiku-4.5",
-    envOverride: "MODEL_HAIKU",
-  },
-  {
-    id: "openai/gpt-5.4-nano",
-    label: "GPT-5.4 Nano",
-    modelId: "openai/gpt-5.4-nano",
-  },
-  {
-    id: "openai/gpt-5.4-mini",
-    label: "GPT-5.4 Mini",
-    modelId: "openai/gpt-5.4-mini",
+    providerPreferences: {
+      order: ["google-vertex"],
+      allow_fallbacks: false,
+      require_parameters: true,
+    },
   },
   {
     id: "qwen/qwen3.5-35b-a3b",
-    label: "Qwen3.5-35B-A3B",
+    label: "Qwen3.5 35B A3B",
     modelId: "qwen/qwen3.5-35b-a3b",
+    providerPreferences: {
+      order: ["atlas-cloud/fp8", "alibaba", "parasail/fp8"],
+      allow_fallbacks: false,
+    }
   },
   {
-    id: "qwen/qwen3.5-9b",
-    label: "Qwen3.5-9B",
-    modelId: "qwen/qwen3.5-9b",
+    id: "qwen/qwen3.5-27b",
+    label: "Qwen3.5 27B",
+    modelId: "qwen/qwen3.5-27b",
+    providerPreferences: {
+      order: ["novita/bf16"],
+      allow_fallbacks: false,
+    }
+  },
+  {
+    id: "qwen/qwen3-32b",
+    label: "Qwen3 32B",
+    modelId: "qwen/qwen3-32b",
+    providerPreferences: {
+      order: ["groq", "deepinfra/fp8", "alibaba"],
+      allow_fallbacks: false,
+    }
+  },
+  {
+    id: "moonshotai/kimi-k2.5",
+    label: "Kimi K2.5",
+    modelId: "moonshotai/kimi-k2.5",
+    providerPreferences: {
+      order: ["inceptron/int4", "fireworks", "parasail/int4"],
+      allow_fallbacks: false,
+    }
   },
   {
     id: "openai/gpt-oss-120b",
-    label: "gpt-oss-120b",
+    label: "GPT OSS 120B",
     modelId: "openai/gpt-oss-120b",
+    providerPreferences: {
+      order: ["groq", "google-vertex", "amazon-bedrock"],
+      allow_fallbacks: false,
+    }
   },
 ];
 
